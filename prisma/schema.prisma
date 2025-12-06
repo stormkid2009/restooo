@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(STAFF)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+  CHEF
+}
+
+// Menu Item Model
+model MenuItem {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  category        Category
+  price           Float
+  available       Boolean  @default(true)
+  imageUrl        String?
+  allergens       String[] // Array of allergen strings
+  prepTimeMinutes Int      @default(15)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  orderItems      OrderItem[]
+  @@map("menu_items")
+}
+
+enum Category {
+  APPETIZER
+  MAIN_COURSE
+  DESSERT
+  BEVERAGE
+  SIDE_DISH
+}
+
+// Customer Model
+model Customer {
+  id            String        @id @default(uuid())
+  name          String
+  email         String?       @unique
+  phone         String        @unique
+  loyaltyPoints Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  orders        Order[]
+  reservations  Reservation[]
+  @@map("customers")
+}
+
+// Table Model
+model Table {
+  id           String        @id @default(uuid())
+  number       Int           @unique
+  capacity     Int
+  status       TableStatus   @default(AVAILABLE)
+  location     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  orders       Order[]
+  reservations Reservation[]
+  @@map("tables")
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+}
+
+// Order Model
+model Order {
+  id           String      @id @default(uuid())
+  orderNumber  String      @unique
+  tableId      String?
+  customerId   String?
+  userId       String?
+  status       OrderStatus @default(PENDING)
+  orderType    OrderType   @default(DINE_IN)
+  subtotal     Float
+  tax          Float
+  tip          Float       @default(0)
+  total        Float
+  createdAt    DateTime    @default(now())
+  completedAt  DateTime?
+  
+  table        Table?      @relation(fields: [tableId], references: [id])
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  user         User?       @relation(fields: [userId], references: [id])
+  items        OrderItem[]
+  
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEOUT
+  DELIVERY
+}
+
+// Order Item Model (Junction table with extra fields)
+model OrderItem {
+  id                  String   @id @default(uuid())
+  orderId             String
+  menuItemId          String
+  quantity            Int
+  price               Float
+  specialInstructions String?
+  createdAt           DateTime @default(now())
+  
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem            MenuItem @relation(fields: [menuItemId], references: [id])
+  
+  @@map("order_items")
+}
+
+// Reservation Model
+model Reservation {
+  id              String            @id @default(uuid())
+  customerId      String
+  tableId         String?
+  date            DateTime
+  time            String
+  partySize       Int
+  status          ReservationStatus @default(PENDING)
+  specialRequests String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  table           Table?            @relation(fields: [tableId], references: [id])
+  
+  @@map("reservations")
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// Staff Model
+model Staff {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  role      String
+  shift     String?
+  active    Boolean  @default(true)
+  hireDate  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("staff")
+}
