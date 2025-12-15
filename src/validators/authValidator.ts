@@ -7,19 +7,15 @@ import { z } from "zod";
  */
 const baseUserSchema = z.object({
   email: z
-    .string({
-      required_error: "Email is required",
-      invalid_type_error: "Email must be a string",
-    })
+    .string()
+    .min(1, { message: "Email is required" }) // replaces required_errors
     .email({
       message: "Invalid email format",
     }),
 
   password: z
-    .string({
-      required_error: "Password is required",
-      invalid_type_error: "Password must be a string",
-    })
+    .string()
+    .min(1, { message: "Password is required" }) // replaces required_errors
     .min(6, {
       message: "Password must be at least 6 characters long",
     }),
@@ -30,20 +26,13 @@ const baseUserSchema = z.object({
  * Extends base schema with additional fields needed for registration
  */
 export const registerSchema = baseUserSchema.extend({
-  name: z
-    .string({
-      required_error: "Name is required",
-      invalid_type_error: "Name must be a string",
-    })
-    .min(2, {
-      message: "Name must be at least 2 characters long",
-    }),
+  name: z.string().min(1, { message: "Name is required" }).min(2, {
+    message: "Name must be at least 2 characters long",
+  }),
 
   role: z
     .enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
-      errorMap: () => ({
-        message: "Role must be one of: ADMIN, MANAGER, STAFF, or CHEF",
-      }),
+      message: "Role must be one of: ADMIN, MANAGER, STAFF, or CHEF",
     })
     .optional(),
 });
