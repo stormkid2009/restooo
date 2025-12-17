@@ -2,6 +2,7 @@
 import prisma from "../config/database";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { StringValue } from "ms";
 import { RegisterInput, LoginInput } from "../validators/authValidator";
 
 /**
@@ -266,20 +267,27 @@ class AuthService {
   private generateToken(user: {
     id: string;
     email: string;
-    role: string;
+    role?: string; // make it optional to match schema reality
   }): string {
     // Create minimal payload (smaller token = faster transmission)
     const payload = {
       userId: user.id,
       email: user.email,
-      role: user.role,
+      role: user.role ?? "STAFF", // Default in case of undefined
     };
 
     // Sign the token with secret from environment variables
     // ! tells TypeScript we're sure JWT_SECRET exists (we check in .env)
-    return jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: process.env.JWT_EXPIRE || "7d", // Default 7 days if not set
-    });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET is not defined");
+    }
+
+    // Cast to StringValue for type safety
+    const expiresIn: StringValue | number | undefined =
+      (process.env.JWT_EXPIRE as StringValue) || "7d";
+
+    return jwt.sign(payload, secret, { expiresIn });
   }
 }
 

@@ -1,6 +1,7 @@
-import app from './app';
-import dotenv from 'dotenv';
-import { connectDatabase, disconnectDatabase } from './config/database';
+import app from "./app";
+import dotenv from "dotenv";
+import env from "./config/env";
+import { connectDatabase, disconnectDatabase } from "./config/database";
 
 // Load environment variables
 dotenv.config();
@@ -14,7 +15,7 @@ const startServer = async () => {
 
     // Start server
     const server = app.listen(PORT, () => {
-      console.log('🍽️  Restooo API Server Started!');
+      console.log("🍽️  Restooo API Server Started!");
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV}`);
       console.log(`🔗 URL: http://localhost:${PORT}`);
@@ -22,23 +23,23 @@ const startServer = async () => {
     });
 
     // Graceful shutdown
-    process.on('SIGTERM', async () => {
-      console.log('⚠️  SIGTERM received, shutting down gracefully...');
+    process.on("SIGTERM", async () => {
+      console.log("⚠️  SIGTERM received, shutting down gracefully...");
       server.close(async () => {
         await disconnectDatabase();
         process.exit(0);
       });
     });
 
-    process.on('SIGINT', async () => {
-      console.log('\n⚠️  SIGINT received, shutting down gracefully...');
+    process.on("SIGINT", async () => {
+      console.log("\n⚠️  SIGINT received, shutting down gracefully...");
       server.close(async () => {
         await disconnectDatabase();
         process.exit(0);
       });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 };
