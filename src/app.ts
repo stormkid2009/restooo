@@ -1,19 +1,20 @@
+// src/app.ts
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import authRoutes from "./routes/authRoutes"; // ← Add this
+import routes from "./routes";
 
 const app: Application = express();
 
 // Middleware
-app.use(helmet());
-app.use(cors());
-app.use(morgan("dev"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(helmet()); // Security headers
+app.use(cors()); // Enable CORS
+app.use(morgan("dev")); // Logging
+app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Health check route
+// Health check route (outside API versioning)
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "success",
@@ -22,8 +23,6 @@ app.get("/health", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
 });
-// Auth routes
-app.use("/api/v1/auth", authRoutes); // ← Add this
 
 // Root route
 app.get("/", (req: Request, res: Response) => {
@@ -36,12 +35,16 @@ app.get("/", (req: Request, res: Response) => {
     endpoints: {
       health: "/health",
       api: "/api/v1",
-      docs: "/api/v1/docs",
+      auth: "/api/v1/auth",
+      docs: "/api/v1/docs (coming soon)",
     },
   });
 });
 
-// 404 handler
+// API Routes (v1)
+app.use("/api/v1", routes);
+
+// 404 handler (must be last)
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     status: "error",
