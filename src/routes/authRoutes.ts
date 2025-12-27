@@ -3,6 +3,7 @@ import { Router } from "express";
 import { validate } from "../middleware/validationMiddleware";
 import { registerSchema, loginSchema } from "../validators/authValidator";
 import authController from "../controllers/authController";
+import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
 
@@ -30,35 +31,20 @@ router.post("/login", validate(loginSchema), authController.login);
  * @access  Private (requires JWT token)
  * @headers Authorization: Bearer <token>
  * @returns { status: "success", data: { user } }
- *
- * @todo Uncomment when auth middleware is implemented
- * @todo Add authMiddleware before controller
- * @todo Implement authController.me method
  */
-// router.get(
-//   '/me',
-//   authMiddleware,  // TODO: Import and implement
-//   authController.me
-// );
+router.get("/me", authMiddleware, authController.me);
 
 /**
  * @route   POST /api/v1/auth/logout
- * @desc    Logout current user (invalidate token)
+ * @desc    Logout current user (client-side token removal)
  * @access  Private (requires JWT token)
  * @headers Authorization: Bearer <token>
  * @returns { status: "success", message: "Logged out successfully" }
  *
- * @todo Uncomment when auth middleware is implemented
- * @todo Add authMiddleware before controller
- * @todo Implement authController.logout method
- * @note With JWT, logout is mainly client-side (remove token)
- *       Server-side implementation is optional (token blacklist)
+ * @note Currently client-side logout only (remove token from client)
+ *       Server-side token blacklist to be implemented in future
  */
-// router.post(
-//   '/logout',
-//   authMiddleware,  // TODO: Import and implement
-//   authController.logout
-// );
+router.post("/logout", authMiddleware, authController.logout);
 
 export default router;
 
