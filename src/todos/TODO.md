@@ -29,7 +29,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Create endpoint: `POST /api/v1/auth/logout` (server-side)
   - File: `src/middleware/authMiddleware.ts`
 
-- [T] **Implement /me and /logout Endpoints**
+- [&check;] **Implement /me and /logout Endpoints**
   - Uncomment routes in `src/routes/authRoutes.ts`
   - Create `authController.me` method (return current user info)
   - Create `authController.logout` method (blacklist token)
