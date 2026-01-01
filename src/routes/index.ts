@@ -1,9 +1,9 @@
 // src/routes/index.ts
 import { Router } from "express";
 import authRoutes from "./authRoutes";
+import menuRoutes from "./menuRoutes";
 
 // Future route imports
-// import menuRoutes from './menuRoutes';
 // import orderRoutes from './orderRoutes';
 // import reservationRoutes from './reservationRoutes';
 // import customerRoutes from './customerRoutes';
@@ -33,9 +33,9 @@ router.use("/auth", authRoutes);
  *   - POST / - Create menu item
  *   - PUT /:id - Update menu item
  *   - DELETE /:id - Delete menu item
- * @todo Implement menu routes
+ *
  */
-// router.use('/menu', menuRoutes);
+router.use("/menu", menuRoutes);
 
 /**
  * Order Management Routes
