@@ -19,8 +19,8 @@ const router = Router();
  * @routes
  *   - POST /register - Register new user
  *   - POST /login - Authenticate user
- *   - GET /me - Get current user (TODO)
- *   - POST /logout - Logout user (TODO)
+ *   - GET /me - Get current user
+ *   - POST /logout - Logout user
  */
 router.use("/auth", authRoutes);
 
@@ -28,12 +28,11 @@ router.use("/auth", authRoutes);
  * Menu Management Routes
  * @prefix /api/v1/menu
  * @routes
- *   - GET / - List all menu items
+ *   - GET / - List all menu items (with filters)
  *   - GET /:id - Get single menu item
- *   - POST / - Create menu item
- *   - PUT /:id - Update menu item
- *   - DELETE /:id - Delete menu item
- *
+ *   - POST / - Create menu item (ADMIN, MANAGER)
+ *   - PUT /:id - Update menu item (ADMIN, MANAGER)
+ *   - DELETE /:id - Delete menu item (ADMIN)
  */
 router.use("/menu", menuRoutes);
 
