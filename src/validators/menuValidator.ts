@@ -59,6 +59,8 @@ export const updateMenuSchema = createMenuSchema.partial();
  * Validates query parameters for listing/filtering menu items
  *
  * Note: Query params come as strings, so we use coerce to transform them
+ * coerce transform data before validation
+ * transform validate data first then transform it
  */
 export const listMenuSchema = z
   .object({
