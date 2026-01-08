@@ -1,6 +1,6 @@
 // src/controllers/menuController.ts
 import { Request, Response } from "express";
-import menuService from "../services/menuService";
+import menuService from "./menu.service";
 
 /**
  * Menu Controller

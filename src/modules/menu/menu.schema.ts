@@ -1,4 +1,4 @@
-// src/validators/menuValidator.ts
+// src/modules/menu/menu.schema.ts
 import { z } from "zod";
 
 /**

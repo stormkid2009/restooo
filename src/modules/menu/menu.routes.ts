@@ -1,13 +1,13 @@
 // src/routes/menuRoutes.ts
 import { Router } from "express";
-import { validate, validateQuery } from "../middleware/validationMiddleware";
-import { authMiddleware, requireRole } from "../middleware/authMiddleware";
+import { validate, validateQuery } from "../../middleware/validationMiddleware";
+import { authMiddleware, requireRole } from "../../middleware/authMiddleware";
 import {
   createMenuSchema,
   updateMenuSchema,
   listMenuSchema,
-} from "../validators/menuValidator";
-import menuController from "../controllers/menuController";
+} from "./menu.schema";
+import menuController from "./menu.controller";
 
 const router = Router();
 

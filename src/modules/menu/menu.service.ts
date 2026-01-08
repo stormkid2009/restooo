@@ -1,10 +1,6 @@
 // src/services/menuService.ts
-import prisma from "../config/database";
-import {
-  CreateMenuInput,
-  UpdateMenuInput,
-  ListMenuQuery,
-} from "../validators/menuValidator";
+import prisma from "../../config/database";
+import { CreateMenuInput, UpdateMenuInput, ListMenuQuery } from "./menu.schema";
 
 /**
  * Service Response Type
