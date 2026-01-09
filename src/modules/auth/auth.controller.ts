@@ -1,7 +1,7 @@
 // src/controllers/authController.ts
 import { Request, Response } from "express";
-import authService from "../services/authService";
-import prisma from "../config/database";
+import authService from "./auth.service";
+import prisma from "../../config/database";
 
 /**
  * Auth Controller

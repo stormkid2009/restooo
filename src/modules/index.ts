@@ -1,6 +1,6 @@
 // src/routes/index.ts
 import { Router } from "express";
-import authRoutes from "../routes/authRoutes";
+import authRoutes from "./auth/auth.routes";
 import menuRoutes from "./menu/menu.routes";
 
 // Future route imports

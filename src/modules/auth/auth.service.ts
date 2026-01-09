@@ -1,9 +1,9 @@
 // src/services/authService.ts
-import prisma from "../config/database";
+import prisma from "../../config/database";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
-import { RegisterInput, LoginInput } from "../validators/authValidator";
+import { RegisterInput, LoginInput } from "./auth.schema";
 
 /**
  * Service Response Type
