@@ -1,7 +1,7 @@
 // src/routes/menuRoutes.ts
 import { Router } from "express";
-import { validate, validateQuery } from "../../middleware/validationMiddleware";
-import { authMiddleware, requireRole } from "../../middleware/authMiddleware";
+import { validateRequest } from "../../middleware/validateRequest";
+import { authenticate, authorize } from "../../middleware/authenticate";
 import {
   createMenuSchema,
   updateMenuSchema,
@@ -18,7 +18,7 @@ const router = Router();
  * @query   category, available, minPrice, maxPrice, search, limit, offset
  * @returns { status: "success", data: [...items], pagination: {...} }
  */
-router.get("/", validateQuery(listMenuSchema), menuController.list);
+router.get("/", validateRequest(listMenuSchema, "query"), menuController.list);
 
 /**
  * @route   GET /api/v1/menu/:id
@@ -39,9 +39,9 @@ router.get("/:id", menuController.getById);
  */
 router.post(
   "/",
-  authMiddleware,
-  requireRole(["ADMIN", "MANAGER"]),
-  validate(createMenuSchema),
+  authenticate,
+  authorize(["ADMIN", "MANAGER"]),
+  validateRequest(createMenuSchema),
   menuController.create,
 );
 
@@ -56,9 +56,9 @@ router.post(
  */
 router.put(
   "/:id",
-  authMiddleware,
-  requireRole(["ADMIN", "MANAGER"]),
-  validate(updateMenuSchema),
+  authenticate,
+  authorize(["ADMIN", "MANAGER"]),
+  validateRequest(updateMenuSchema),
   menuController.update,
 );
 
@@ -72,8 +72,8 @@ router.put(
  */
 router.delete(
   "/:id",
-  authMiddleware,
-  requireRole(["ADMIN"]),
+  authenticate,
+  authorize(["ADMIN"]),
   menuController.delete,
 );
 
