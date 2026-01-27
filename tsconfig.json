@@ -13,10 +13,7 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
-"typeRoots": [
-      "./node_modules/@types",
-      "./src/types"  // ← Add this line
-    ]
+
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
