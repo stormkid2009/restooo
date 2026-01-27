@@ -2,6 +2,7 @@
 import { Router } from "express";
 import authRoutes from "./auth/auth.routes";
 import menuRoutes from "./menu/menu.routes";
+import userRoutes from "./user/user.routes";
 
 // Future route imports
 // import orderRoutes from './orderRoutes';
@@ -23,6 +24,13 @@ const router = Router();
  *   - POST /logout - Logout user
  */
 router.use("/auth", authRoutes);
+
+/**
+ *  User Routes
+ *  @prefix /api/v1/user
+ *  @routes
+ */
+router.use("/user",userRoutes);
 
 /**
  * Menu Management Routes
