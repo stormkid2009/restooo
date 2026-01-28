@@ -71,11 +71,18 @@ class AuthService {
         role: userResult.data.role,
       });
 
+      const refreshToken = this.generateRefreshToken({
+        userId: userResult.data.id,
+        email: userResult.data.email,
+        role: userResult.data.role,
+      });
+
       return {
         success: true,
         data: {
           user: userResult.data,
           token,
+          refreshToken,
         },
       };
     } catch (error) {
@@ -140,11 +147,18 @@ class AuthService {
         role: user.role,
       });
 
+      const refreshToken = this.generateRefreshToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
       return {
         success: true,
         data: {
           user: userWithoutPassword,
           token,
+          refreshToken,
         },
       };
     } catch (error) {
