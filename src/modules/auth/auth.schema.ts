@@ -1,10 +1,7 @@
 // src/modules/auth/auth.schema.ts
 import { z } from "zod";
 
-/**
- * Email validation regex (RFC 5322 compliant)
- */
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 
 /**
  * Login Schema
@@ -12,15 +9,13 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export const loginSchema = z.object({
   email: z
-    .string({ message: "Email is required" })
-    .min(1, { message: "Email cannot be empty" })
-    .refine((val) => emailRegex.test(val), {
-      message: "Invalid email format",
-    }),
+    .string()
+    .min(1, { error: "Email is required" })
+    .email({ error: "Invalid email format" }),
 
   password: z
-    .string({ message: "Password is required" })
-    .min(1, { message: "Password cannot be empty" }),
+    .string()
+    .min(1, { error: "Password is required" }),
 });
 
 /**
@@ -30,25 +25,23 @@ export const loginSchema = z.object({
  */
 export const registerSchema = z.object({
   email: z
-    .string({ message: "Email is required" })
-    .min(1, { message: "Email cannot be empty" })
-    .refine((val) => emailRegex.test(val), {
-      message: "Invalid email format",
-    }),
+    .string()
+    .min(1, { error: "Email is required" })
+    .email({ error: "Invalid email format" }),
 
   password: z
-    .string({ message: "Password is required" })
-    .min(1, { message: "Password cannot be empty" })
-    .min(6, { message: "Password must be at least 6 characters long" }),
+    .string()
+    .min(1, { error: "Password is required" })
+    .min(6, { error: "Password must be at least 6 characters long" }),
 
   name: z
-    .string({ message: "Name is required" })
-    .min(1, { message: "Name cannot be empty" })
-    .min(2, { message: "Name must be at least 2 characters long" }),
+    .string()
+    .min(1, { error: "Name is required" })
+    .min(2, { error: "Name must be at least 2 characters long" }),
 
   role: z
     .enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
-      message: "Role must be one of: ADMIN, MANAGER, STAFF, or CHEF",
+      error: "Role must be one of: ADMIN, MANAGER, STAFF, or CHEF",
     })
     .optional()
     .default("STAFF"),
@@ -59,11 +52,9 @@ export const registerSchema = z.object({
  */
 export const forgotPasswordSchema = z.object({
   email: z
-    .string({ message: "Email is required" })
-    .min(1, { message: "Email cannot be empty" })
-    .refine((val) => emailRegex.test(val), {
-      message: "Invalid email format",
-    }),
+    .string()
+    .min(1, { error: "Email is required" })
+    .email({ error: "Invalid email format" }),
 });
 
 /**
@@ -71,12 +62,12 @@ export const forgotPasswordSchema = z.object({
  */
 export const resetPasswordSchema = z.object({
   token: z
-    .string({ message: "Reset token is required" })
-    .min(1, { message: "Reset token is required" }),
+    .string()
+    .min(1, { error: "Reset token is required" }),
   newPassword: z
-    .string({ message: "Password is required" })
-    .min(1, { message: "Password is required" })
-    .min(6, { message: "Password must be at least 6 characters long" }),
+    .string()
+    .min(1, { error: "Password is required" })
+    .min(6, { error: "Password must be at least 6 characters long" }),
 });
 
 /**
@@ -84,12 +75,12 @@ export const resetPasswordSchema = z.object({
  */
 export const changePasswordSchema = z.object({
   currentPassword: z
-    .string({ message: "Current password is required" })
-    .min(1, { message: "Current password is required" }),
+    .string()
+    .min(1, { error: "Current password is required" }),
   newPassword: z
-    .string({ message: "New password is required" })
-    .min(1, { message: "New password is required" })
-    .min(6, { message: "New password must be at least 6 characters long" }),
+    .string()
+    .min(1, { error: "New password is required" })
+    .min(6, { error: "New password must be at least 6 characters long" }),
 });
 
 /**
@@ -97,8 +88,8 @@ export const changePasswordSchema = z.object({
  */
 export const refreshTokenSchema = z.object({
   refreshToken: z
-    .string({ message: "Refresh token is required" })
-    .min(1, { message: "Refresh token is required" }),
+    .string()
+    .min(1, { error: "Refresh token is required" }),
 });
 
 // TypeScript Types

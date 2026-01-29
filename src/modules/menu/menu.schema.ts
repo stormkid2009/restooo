@@ -20,31 +20,31 @@ const categoryEnum = z.enum([
 export const createMenuSchema = z.object({
   name: z
     .string()
-    .min(2, "Name must be at least 2 characters long")
-    .max(100, "Name must be at most 100 characters long"),
+    .min(2, { error: "Name must be at least 2 characters long" })
+    .max(100, { error: "Name must be at most 100 characters long" }),
 
   description: z
     .string()
-    .max(500, "Description must be at most 500 characters long")
+    .max(500, { error: "Description must be at most 500 characters long" })
     .optional(),
 
   category: categoryEnum,
 
   price: z
     .number()
-    .positive("Price must be a positive number")
-    .multipleOf(0.01, "Price can have at most 2 decimal places"),
+    .positive({ error: "Price must be a positive number" })
+    .multipleOf(0.01, { error: "Price can have at most 2 decimal places" }),
 
   available: z.boolean().default(true),
 
-  imageUrl: z.string().url("Image URL must be a valid URL").optional(),
+  imageUrl: z.string().url({ error: "Image URL must be a valid URL" }).optional(),
 
   allergens: z.array(z.string()).default([]),
 
   prepTimeMinutes: z
     .number()
-    .int("Prep time must be an integer")
-    .positive("Prep time must be positive")
+    .int({ error: "Prep time must be an integer" })
+    .positive({ error: "Prep time must be positive" })
     .default(15),
 });
 
@@ -73,29 +73,29 @@ export const listMenuSchema = z
     // Filter: Price range
     minPrice: z.coerce
       .number()
-      .positive("Minimum price must be positive")
+      .positive({ error: "Minimum price must be positive" })
       .optional(),
 
     maxPrice: z.coerce
       .number()
-      .positive("Maximum price must be positive")
+      .positive({ error: "Maximum price must be positive" })
       .optional(),
 
     // Filter: Search by name
-    search: z.string().min(1, "Search query must not be empty").optional(),
+    search: z.string().min(1, { error: "Search query must not be empty" }).optional(),
 
     // Pagination
     limit: z.coerce
       .number()
-      .int("Limit must be an integer")
-      .positive("Limit must be positive")
-      .max(100, "Limit cannot exceed 100")
+      .int({ error: "Limit must be an integer" })
+      .positive({ error: "Limit must be positive" })
+      .max(100, { error: "Limit cannot exceed 100" })
       .default(20),
 
     offset: z.coerce
       .number()
-      .int("Offset must be an integer")
-      .min(0, "Offset cannot be negative")
+      .int({ error: "Offset must be an integer" })
+      .min(0, { error: "Offset cannot be negative" })
       .default(0),
   })
   .refine(

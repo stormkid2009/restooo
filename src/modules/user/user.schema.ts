@@ -2,39 +2,27 @@
 import { z } from "zod";
 
 /**
- * Email validation regex (RFC 5322 compliant)
- */
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * UUID validation regex (v4)
- */
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/**
  * Create User Schema
  * Used by ADMIN to create new users
  */
 export const createUserSchema = z.object({
   email: z
-    .string({ message: "Email is required" })
-    .min(1, { message: "Email cannot be empty" })
-    .refine((val) => emailRegex.test(val), {
-      message: "Invalid email format",
-    }),
+    .string()
+    .min(1, { error: "Email is required" })
+    .email({ error: "Invalid email format" }),
 
   password: z
-    .string({ message: "Password is required" })
-    .min(1, { message: "Password cannot be empty" })
-    .min(6, { message: "Password must be at least 6 characters long" }),
+    .string()
+    .min(1, { error: "Password is required" })
+    .min(6, { error: "Password must be at least 6 characters long" }),
 
   name: z
-    .string({ message: "Name is required" })
-    .min(1, { message: "Name cannot be empty" })
-    .min(2, { message: "Name must be at least 2 characters long" }),
+    .string()
+    .min(1, { error: "Name is required" })
+    .min(2, { error: "Name must be at least 2 characters long" }),
 
   role: z.enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
-    message: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
+    error: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
   }),
 
   active: z.boolean().optional(),
@@ -47,19 +35,17 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z.object({
   email: z
     .string()
-    .refine((val) => emailRegex.test(val), {
-      message: "Invalid email format",
-    })
+    .email({ error: "Invalid email format" })
     .optional(),
 
   name: z
     .string()
-    .min(2, { message: "Name must be at least 2 characters long" })
+    .min(2, { error: "Name must be at least 2 characters long" })
     .optional(),
 
   role: z
     .enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
-      message: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
+      error: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
     })
     .optional(),
 
@@ -73,14 +59,12 @@ export const updateUserSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z
     .string()
-    .min(2, { message: "Name must be at least 2 characters long" })
+    .min(2, { error: "Name must be at least 2 characters long" })
     .optional(),
 
   email: z
     .string()
-    .refine((val) => emailRegex.test(val), {
-      message: "Invalid email format",
-    })
+    .email({ error: "Invalid email format" })
     .optional(),
 });
 
@@ -91,15 +75,15 @@ export const userQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
   role: z.enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
-    message: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
+    error: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
   }).optional(),
   active: z.coerce.boolean().optional(),
   search: z.string().optional(), // Search by name or email
   sortBy: z.enum(["name", "email", "createdAt", "role"], {
-    message: "Sort by must be name, email, createdAt, or role",
+    error: "Sort by must be name, email, createdAt, or role",
   }).optional().default("createdAt"),
   sortOrder: z.enum(["asc", "desc"], {
-    message: "Sort order must be asc or desc",
+    error: "Sort order must be asc or desc",
   }).optional().default("desc"),
 });
 
@@ -107,9 +91,7 @@ export const userQuerySchema = z.object({
  * User ID Param Schema
  */
 export const userIdSchema = z.object({
-  id: z.string().refine((val) => uuidRegex.test(val), {
-    message: "Invalid user ID format",
-  }),
+  id: z.string().uuid({ error: "Invalid user ID format" }),
 });
 
 // TypeScript Types

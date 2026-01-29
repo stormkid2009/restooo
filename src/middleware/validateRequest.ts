@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { ZodType, ZodError, core } from "zod";
+import { ZodType, ZodError, ZodIssue } from "zod";
 
 /**
  * Error detail interface
@@ -50,7 +50,7 @@ export const validateRequest = (
         // ZodError uses .issues, .errors might be deprecated/missing
         const issues = (error as any).issues || (error as any).errors || [];
         
-        const errors: ValidationErrorDetail[] = issues.map((err: core.$ZodIssue) => ({
+        const errors: ValidationErrorDetail[] = issues.map((err: ZodIssue) => ({
           field: err.path.join("."),
           message: err.message,
           code: err.code,
