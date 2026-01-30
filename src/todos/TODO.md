@@ -12,7 +12,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Make error messages configurable based on `NODE_ENV`
   - Development: Specific errors ("Token expired", "Invalid signature")
   - Production: Generic errors ("Unauthorized") for security
-  - File: `src/middleware/authMiddleware.ts`
+  - File: `src/middleware/authenticate.ts`
 
 - [ ] **Token Refresh Mechanism**
   - Implement short-lived access tokens (15 minutes)
@@ -20,20 +20,20 @@ This document tracks planned features, improvements, and technical debt for the 
   - Create endpoint: `POST /api/v1/auth/refresh`
   - Store refresh tokens in database or Redis
   - Rotate refresh tokens on each use
-  - File: `src/controllers/authController.ts`, `src/routes/authRoutes.ts`
+  - File: `src/modules/auth/auth.controller.ts`, `src/modules/auth/auth.routes.ts`
 
 - [ ] **Token Blacklist/Revocation**
   - Implement proper server-side logout
   - Store revoked tokens in Redis with TTL
   - Check blacklist in `authMiddleware` before verifying
   - Create endpoint: `POST /api/v1/auth/logout` (server-side)
-  - File: `src/middleware/authMiddleware.ts`
+  - File: `src/middleware/authenticate.ts`
 
 - [&check;] **Implement /me and /logout Endpoints**
   - Uncomment routes in `src/routes/authRoutes.ts`
   - Create `authController.me` method (return current user info)
   - Create `authController.logout` method (blacklist token)
-  - File: `src/controllers/authController.ts`
+  - File: `src/modules/auth/auth.controller.ts`
 
 ### Medium Priority
 
@@ -44,7 +44,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Link permissions to roles (many-to-many)
   - Create middleware: `requirePermission(['menu:create'])`
   - Update Prisma schema
-  - File: `src/middleware/authMiddleware.ts`, `prisma/schema.prisma`
+  - File: `src/middleware/authenticate.ts`, `prisma/schema.prisma`
 
 - [ ] **Rate Limiting Per User**
   - Implement user-specific rate limits based on role
@@ -62,7 +62,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Validate reset token before allowing password change
   - Hash new passwords with bcrypt
   - Integrate email service (SendGrid, AWS SES, or Nodemailer)
-  - Files: `src/controllers/authController.ts`, `src/services/emailService.ts`
+  - Files: `src/modules/auth/auth.controller.ts`, `src/services/emailService.ts`
 
 - [ ] **Account Lockout After Failed Attempts**
   - Lock account after 5 consecutive failed login attempts
@@ -71,7 +71,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Send email notification on lockout
   - Require email verification to manually unlock
   - Add `lockedUntil` field to User model
-  - File: `src/services/authService.ts`, `prisma/schema.prisma`
+  - File: `src/modules/auth/auth.service.ts`, `prisma/schema.prisma`
 
 ### Low Priority
 
@@ -84,7 +84,7 @@ This document tracks planned features, improvements, and technical debt for the 
     - `POST /api/v1/auth/2fa/verify` - Verify TOTP code
     - `POST /api/v1/auth/2fa/disable` - Disable 2FA
   - Modify login flow to check for 2FA
-  - Files: `src/controllers/authController.ts`, `src/services/authService.ts`
+  - Files: `src/modules/auth/auth.controller.ts`, `src/modules/auth/auth.service.ts`
 
 - [ ] **Email Verification**
   - Send verification email on registration
@@ -93,7 +93,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Create endpoint: `POST /api/v1/auth/verify-email`
   - Require verification for sensitive operations
   - Resend verification email option
-  - Files: `src/services/authService.ts`, `src/services/emailService.ts`
+  - Files: `src/modules/auth/auth.service.ts`, `src/services/emailService.ts`
 
 - [ ] **Social Authentication (OAuth)**
   - Implement Google OAuth 2.0
@@ -102,7 +102,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Link social accounts to existing users
   - Store provider + providerId in User model
   - Library: `passport` + `passport-google-oauth20`, etc.
-  - Files: `src/config/passport.ts`, `src/routes/authRoutes.ts`
+  - Files: `src/config/passport.ts`, `src/modules/auth/auth.routes.ts`
 
 - [ ] **Multi-Device Session Management**
   - Track active sessions per user across devices
@@ -112,7 +112,7 @@ This document tracks planned features, improvements, and technical debt for the 
     - `GET /api/v1/auth/sessions` - List active sessions
     - `DELETE /api/v1/auth/sessions/:id` - Revoke specific session
     - `DELETE /api/v1/auth/sessions/all` - Revoke all sessions (except current)
-  - Files: `src/models/Session.ts`, `src/controllers/authController.ts`
+  - Files: `src/models/Session.ts`, `src/modules/auth/auth.controller.ts`
 
 - [ ] **Audit Logging**
   - Log all authentication events to database
@@ -134,7 +134,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Keep active users logged in automatically
   - Set maximum session duration (e.g., 30 days)
   - Balance: security vs user experience
-  - File: `src/middleware/authMiddleware.ts`
+  - File: `src/middleware/authenticate.ts`
 
 ---
 
@@ -154,7 +154,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Add validation schemas with Zod
   - Implement filtering (category, available, price range)
   - Implement pagination
-  - Files: `src/services/menuService.ts`, `src/controllers/menuController.ts`, `src/routes/menuRoutes.ts`
+  - Files: `src/modules/menu/menu.service.ts`, `src/modules/menu/menu.controller.ts`, `src/modules/menu/menu.routes.ts`
 
 ### Medium Priority
 
@@ -170,13 +170,13 @@ This document tracks planned features, improvements, and technical debt for the 
   - Add schedule fields to MenuItem (e.g., available Mon-Fri, 9am-5pm)
   - Auto-update availability based on schedule
   - Cron job or scheduler to check availability
-  - File: `src/services/menuService.ts`
+  - File: `src/modules/menu/menu.service.ts`
 
 - [ ] **Dietary Information & Allergens**
   - Already in schema, ensure proper implementation
   - Add validation for allergen list
   - Create filter endpoint: `GET /menu?allergen=dairy,gluten`
-  - File: `src/validators/menuValidator.ts`
+  - File: `src/modules/menu/menu.validator.ts`
 
 ---
 
@@ -196,7 +196,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Implement order number generation
   - Calculate totals (subtotal, tax, tip, total)
   - Validate menu items exist and are available
-  - Files: `src/services/orderService.ts`, `src/controllers/orderController.ts`, `src/routes/orderRoutes.ts`
+  - Files: `src/modules/order/order.service.ts`, `src/modules/order/order.controller.ts`, `src/modules/order/order.routes.ts`
 
 ### Medium Priority
 
@@ -205,21 +205,21 @@ This document tracks planned features, improvements, and technical debt for the 
   - Notify kitchen when new order arrives
   - Notify customer when order status changes
   - Library: `socket.io`
-  - File: `src/sockets/orderSocket.ts`
+  - File: `src/modules/order/order.socket.ts`
 
 - [ ] **Order History & Analytics**
   - Track order history per customer
   - Calculate average order value
   - Track popular items
   - Revenue reports by date range
-  - File: `src/services/analyticsService.ts`
+  - File: `src/modules/analytics/analytics.service.ts`
 
 - [ ] **Kitchen Display System (KDS)**
   - Separate view for kitchen staff
   - Show orders by preparation time
   - Mark items as complete
   - Real-time updates
-  - Files: `src/routes/kitchenRoutes.ts`, frontend integration
+  - Files: `src/modules/kitchen/kitchen.routes.ts`, frontend integration
 
 ---
 
@@ -240,7 +240,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Validate date/time
   - Check table availability
   - Prevent double-booking
-  - Files: `src/services/reservationService.ts`, `src/controllers/reservationController.ts`, `src/routes/reservationRoutes.ts`
+  - Files: `src/modules/reservation/reservation.service.ts`, `src/modules/reservation/reservation.controller.ts`, `src/modules/reservation/reservation.routes.ts`
 
 ### Medium Priority
 
@@ -254,7 +254,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Add customers to waitlist when no tables available
   - Notify when table becomes available
   - Auto-remove from waitlist after time limit
-  - File: `src/services/reservationService.ts`
+  - File: `src/modules/reservation/reservation.service.ts`
 
 ---
 
@@ -272,7 +272,7 @@ This document tracks planned features, improvements, and technical debt for the 
     - `PUT /api/v1/customers/:id` - Update customer
     - `DELETE /api/v1/customers/:id` - Delete customer
     - `GET /api/v1/customers/:id/orders` - Get order history
-  - Files: `src/services/customerService.ts`, `src/controllers/customerController.ts`, `src/routes/customerRoutes.ts`
+  - Files: `src/modules/customer/customer.service.ts`, `src/modules/customer/customer.controller.ts`, `src/modules/customer/customer.routes.ts`
 
 ### Medium Priority
 
@@ -281,7 +281,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Redeem points for discounts
   - Track points history
   - Add points expiration
-  - File: `src/services/loyaltyService.ts`
+  - File: `src/modules/loyalty/loyalty.service.ts`
 
 - [ ] **Customer Preferences**
   - Store dietary restrictions
@@ -306,7 +306,7 @@ This document tracks planned features, improvements, and technical debt for the 
     - `PUT /api/v1/tables/:id` - Update table (ADMIN, MANAGER)
     - `PATCH /api/v1/tables/:id/status` - Update table status
     - `DELETE /api/v1/tables/:id` - Delete table (ADMIN)
-  - Files: `src/services/tableService.ts`, `src/controllers/tableController.ts`, `src/routes/tableRoutes.ts`
+  - Files: `src/modules/table/table.service.ts`, `src/modules/table/table.controller.ts`, `src/modules/table/table.routes.ts`
 
 ### Medium Priority
 
@@ -314,7 +314,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Real-time table status dashboard
   - Show occupied, available, reserved tables
   - Visual floor plan (future frontend feature)
-  - File: `src/controllers/tableController.ts`
+  - File: `src/modules/table/table.controller.ts`
 
 ---
 
@@ -331,7 +331,7 @@ This document tracks planned features, improvements, and technical debt for the 
     - `POST /api/v1/staff` - Create staff member (ADMIN)
     - `PUT /api/v1/staff/:id` - Update staff member (ADMIN, MANAGER)
     - `DELETE /api/v1/staff/:id` - Delete staff member (ADMIN)
-  - Files: `src/services/staffService.ts`, `src/controllers/staffController.ts`, `src/routes/staffRoutes.ts`
+  - Files: `src/modules/user/user.service.ts`, `src/modules/user/user.controller.ts`, `src/modules/user/user.routes.ts`
 
 ### Medium Priority
 
@@ -340,7 +340,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Track working hours
   - Prevent scheduling conflicts
   - Create new table: `shifts`
-  - Files: `prisma/schema.prisma`, `src/services/shiftService.ts`
+  - Files: `prisma/schema.prisma`, `src/modules/shift/shift.service.ts`
 
 ---
 
@@ -357,7 +357,7 @@ This document tracks planned features, improvements, and technical debt for the 
     - `GET /api/v1/analytics/revenue` - Revenue reports
     - `GET /api/v1/analytics/reservations` - Reservation statistics
   - Require ADMIN or MANAGER role
-  - Files: `src/services/analyticsService.ts`, `src/controllers/analyticsController.ts`, `src/routes/analyticsRoutes.ts`
+  - Files: `src/modules/analytics/analytics.service.ts`, `src/modules/analytics/analytics.controller.ts`, `src/modules/analytics/analytics.routes.ts`
 
 ### Medium Priority
 
@@ -367,7 +367,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Dashboard with charts (frontend)
   - Profit margins calculation
   - Library: `pdfkit` or `puppeteer` for PDF
-  - File: `src/services/reportService.ts`
+  - File: `src/modules/report/report.service.ts`
 
 ---
 
@@ -584,7 +584,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Process online payments
   - Split bills
   - Tip calculation
-  - Files: `src/services/paymentService.ts`
+  - Files: `src/modules/payment/payment.service.ts`
 
 - [ ] **Inventory Management**
   - Track ingredient stock
