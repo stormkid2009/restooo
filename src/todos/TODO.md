@@ -14,7 +14,7 @@ This document tracks planned features, improvements, and technical debt for the 
   - Production: Generic errors ("Unauthorized") for security
   - File: `src/middleware/authenticate.ts`
 
-- [ ] **Token Refresh Mechanism**
+- [&check;] **Token Refresh Mechanism**
   - Implement short-lived access tokens (15 minutes)
   - Implement long-lived refresh tokens (7 days)
   - Create endpoint: `POST /api/v1/auth/refresh`
@@ -142,7 +142,7 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [ ] **Implement Menu CRUD Operations**
+- [&check;] **Implement Menu CRUD Operations**
   - Create `menuService.ts` with business logic
   - Create `menuController.ts` with HTTP handlers
   - Create `menuRoutes.ts` with endpoints:
@@ -185,7 +185,8 @@ This document tracks planned features, improvements, and technical debt for the 
 ### High Priority
 
 - [ ] **Implement Order CRUD Operations**
-  - Create `orderService.ts` with business logic
+  - Create `src/modules/order` directory
+  - Create `order.service.ts` with business logic
   - Create `orderController.ts` with HTTP handlers
   - Create `orderRoutes.ts` with endpoints:
     - `GET /api/v1/orders` - List all orders (with filters)
@@ -228,7 +229,8 @@ This document tracks planned features, improvements, and technical debt for the 
 ### High Priority
 
 - [ ] **Implement Reservation CRUD Operations**
-  - Create `reservationService.ts` with business logic
+  - Create `src/modules/reservation` directory
+  - Create `reservation.service.ts` with business logic
   - Create `reservationController.ts` with HTTP handlers
   - Create `reservationRoutes.ts` with endpoints:
     - `GET /api/v1/reservations` - List all reservations
@@ -263,7 +265,8 @@ This document tracks planned features, improvements, and technical debt for the 
 ### High Priority
 
 - [ ] **Implement Customer CRUD Operations**
-  - Create `customerService.ts` with business logic
+  - Create `src/modules/customer` directory
+  - Create `customer.service.ts` with business logic
   - Create `customerController.ts` with HTTP handlers
   - Create `customerRoutes.ts` with endpoints:
     - `GET /api/v1/customers` - List all customers
@@ -297,7 +300,8 @@ This document tracks planned features, improvements, and technical debt for the 
 ### High Priority
 
 - [ ] **Implement Table CRUD Operations**
-  - Create `tableService.ts` with business logic
+  - Create `src/modules/table` directory
+  - Create `table.service.ts` with business logic
   - Create `tableController.ts` with HTTP handlers
   - Create `tableRoutes.ts` with endpoints:
     - `GET /api/v1/tables` - List all tables
@@ -322,9 +326,9 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [ ] **Implement Staff CRUD Operations**
-  - Create `staffService.ts` with business logic
-  - Create `staffController.ts` with HTTP handlers
+- [&check;] **Implement Staff CRUD Operations**
+  - Handled by `src/modules/user` (Roles: ADMIN, MANAGER, STAFF, CHEF)
+  - `staff.controller.ts` not needed (use userController)
   - Create `staffRoutes.ts` with endpoints:
     - `GET /api/v1/staff` - List all staff (ADMIN, MANAGER)
     - `GET /api/v1/staff/:id` - Get single staff member
