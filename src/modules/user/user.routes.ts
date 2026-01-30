@@ -1,5 +1,5 @@
 // ============================================
-// src/features/user/user.routes.ts
+// src/modules/user/user.routes.ts
 // ============================================
 import { Router } from "express";
 import userController from "./user.controller";
@@ -21,7 +21,7 @@ const router = Router();
  * Most require ADMIN or MANAGER role
  */
 
-// GET /api/v1/users - List all users
+// GET /api/v1/user - List all users
 router.get(
   "/",
   authenticate,
@@ -30,7 +30,7 @@ router.get(
   userController.getUsers,
 );
 
-// GET /api/v1/users/:id - Get user by ID
+// GET /api/v1/user/:id - Get user by ID
 router.get(
   "/:id",
   authenticate,
@@ -39,7 +39,7 @@ router.get(
   userController.getUserById,
 );
 
-// POST /api/v1/users - Create new user (ADMIN only)
+// POST /api/v1/user - Create new user (ADMIN only)
 router.post(
   "/",
   authenticate,
@@ -48,7 +48,7 @@ router.post(
   userController.createUser,
 );
 
-// PUT /api/v1/users/:id - Update user (ADMIN or MANAGER)
+// PUT /api/v1/user/:id - Update user (ADMIN or MANAGER)
 router.put(
   "/:id",
   authenticate,
@@ -58,7 +58,7 @@ router.put(
   userController.updateUser,
 );
 
-// PATCH /api/v1/users/profile - Update own profile
+// PATCH /api/v1/user/profile - Update own profile
 router.patch(
   "/profile",
   authenticate,
@@ -66,7 +66,7 @@ router.patch(
   userController.updateProfile,
 );
 
-// DELETE /api/v1/users/:id - Delete user (ADMIN only)
+// DELETE /api/v1/user/:id - Delete user (ADMIN only)
 router.delete(
   "/:id",
   authenticate,
@@ -75,7 +75,7 @@ router.delete(
   userController.deleteUser,
 );
 
-// PATCH /api/v1/users/:id/activate - Activate user
+// PATCH /api/v1/user/:id/activate - Activate user
 router.patch(
   "/:id/activate",
   authenticate,
@@ -84,7 +84,7 @@ router.patch(
   userController.activateUser,
 );
 
-// PATCH /api/v1/users/:id/deactivate - Deactivate user
+// PATCH /api/v1/user/:id/deactivate - Deactivate user
 router.patch(
   "/:id/deactivate",
   authenticate,
