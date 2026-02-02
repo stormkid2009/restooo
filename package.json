@@ -14,7 +14,10 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker-compose logs -f postgres"
+    "docker:logs": "docker compose logs -f postgres",
+    "docker:ps": "docker compose ps",
+    "docker:exec": "docker compose exec postgres psql -U restooo_admin -d restooo_db",
+    "docker:shell": "docker compose exec postgres bash"
   },
   "keywords": [
     "restaurant",
