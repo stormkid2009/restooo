@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,21 +9,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User Model
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(STAFF)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  orders    Order[]
-  @@map("users")
-}
+// ════════════════════════════════════════════════════════════════
+// ENUMS
+// ════════════════════════════════════════════════════════════════
 
+// Employee roles
 enum Role {
   ADMIN
   MANAGER
@@ -29,24 +21,7 @@ enum Role {
   CHEF
 }
 
-// Menu Item Model
-model MenuItem {
-  id              String   @id @default(uuid())
-  name            String
-  description     String?
-  category        Category
-  price           Float
-  available       Boolean  @default(true)
-  imageUrl        String?
-  allergens       String[] // Array of allergen strings
-  prepTimeMinutes Int      @default(15)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  orderItems      OrderItem[]
-  @@map("menu_items")
-}
-
+// Menu categories
 enum Category {
   APPETIZER
   MAIN_COURSE
@@ -55,117 +30,35 @@ enum Category {
   SIDE_DISH
 }
 
-// Customer Model
-model Customer {
-  id            String        @id @default(uuid())
-  name          String
-  email         String?       @unique
-  phone         String        @unique
-  loyaltyPoints Int           @default(0)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  
-  orders        Order[]
-  reservations  Reservation[]
-  @@map("customers")
-}
-
-// Table Model
-model Table {
-  id           String        @id @default(uuid())
-  number       Int           @unique
-  capacity     Int
-  status       TableStatus   @default(AVAILABLE)
-  location     String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  
-  orders       Order[]
-  reservations Reservation[]
-  @@map("tables")
-}
-
+// Table statuses
 enum TableStatus {
   AVAILABLE
   OCCUPIED
   RESERVED
   MAINTENANCE
+  DIRTY
 }
 
-// Order Model
-model Order {
-  id           String      @id @default(uuid())
-  orderNumber  String      @unique
-  tableId      String?
-  customerId   String?
-  userId       String?
-  status       OrderStatus @default(PENDING)
-  orderType    OrderType   @default(DINE_IN)
-  subtotal     Float
-  tax          Float
-  tip          Float       @default(0)
-  total        Float
-  createdAt    DateTime    @default(now())
-  completedAt  DateTime?
-  
-  table        Table?      @relation(fields: [tableId], references: [id])
-  customer     Customer?   @relation(fields: [customerId], references: [id])
-  user         User?       @relation(fields: [userId], references: [id])
-  items        OrderItem[]
-  
-  @@map("orders")
-}
-
+// Order statuses (with delivery additions)
 enum OrderStatus {
   PENDING
   PREPARING
   READY
   SERVED
+  OUT_FOR_DELIVERY
+  DELIVERED
   COMPLETED
   CANCELLED
 }
 
+// Order types
 enum OrderType {
   DINE_IN
   TAKEOUT
   DELIVERY
 }
 
-// Order Item Model (Junction table with extra fields)
-model OrderItem {
-  id                  String   @id @default(uuid())
-  orderId             String
-  menuItemId          String
-  quantity            Int
-  price               Float
-  specialInstructions String?
-  createdAt           DateTime @default(now())
-  
-  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem            MenuItem @relation(fields: [menuItemId], references: [id])
-  
-  @@map("order_items")
-}
-
-// Reservation Model
-model Reservation {
-  id              String            @id @default(uuid())
-  customerId      String
-  tableId         String?
-  date            DateTime
-  time            String
-  partySize       Int
-  status          ReservationStatus @default(PENDING)
-  specialRequests String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  table           Table?            @relation(fields: [tableId], references: [id])
-  
-  @@map("reservations")
-}
-
+// Reservation statuses
 enum ReservationStatus {
   PENDING
   CONFIRMED
@@ -175,18 +68,389 @@ enum ReservationStatus {
   NO_SHOW
 }
 
-// Staff Model
-model Staff {
-  id        String   @id @default(uuid())
+// Payment methods
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+  MOBILE_WALLET  // e.g., Fawry in Egypt
+}
+
+// Payment statuses
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+// Delivery statuses
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+}
+
+// ════════════════════════════════════════════════════════════════
+// CORE: RESTAURANT (Multi-location support)
+// ════════════════════════════════════════════════════════════════
+
+model Restaurant {
+  id        String    @id @default(uuid())
   name      String
-  email     String   @unique
-  phone     String
-  role      String
+  address   String?
+  phone     String?
+  email     String    @unique  // ✅ Required for contact
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // ✅ Soft delete using deletedAt pattern
+
+  // Relations
+  employees    Employee[]
+  customers    Customer[]
+  menuItems    MenuItem[]
+  tables       Table[]
+  orders       Order[]
+  reservations Reservation[]
+  payments     Payment[]
+  ingredients  Ingredient[]
+  inventory    Inventory[]
+  deliveries   Delivery[]
+
+  @@map("restaurants")
+  @@index([deletedAt]) // For filtering active restaurants
+}
+
+// ════════════════════════════════════════════════════════════════
+// EMPLOYEES (Internal staff - admin-created only)
+// ════════════════════════════════════════════════════════════════
+
+model Employee {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String    // ✅ Required - all employees must be able to login
+  name      String
+  phone     String?
+  role      Role      @default(STAFF)
   shift     String?
-  active    Boolean  @default(true)
-  hireDate  DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  hireDate  DateTime  @default(now())
+  active    Boolean   @default(true) // For enabling/disabling accounts
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // ✅ Soft delete
+
+  // Relations
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  orders       Order[]
+
+  @@map("employees")
+  @@index([restaurantId, role])
+  @@index([restaurantId, deletedAt])
+  @@index([email])
+}
+
+// ════════════════════════════════════════════════════════════════
+// CUSTOMERS (Public registration)
+// ════════════════════════════════════════════════════════════════
+
+model Customer {
+  id            String    @id @default(uuid())
+  email         String    @unique // ✅ Required for registration & login
+  password      String    // ✅ Required for authentication
+  name          String
+  phone         String    @unique // ✅ Required & unique (important for delivery)
+  loyaltyPoints Int       @default(0)
+  addresses     Json?     // Array of address objects: [{"type": "home", "address": "...", "city": "..."}]
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // ✅ Soft delete
+
+  // Relations
+  restaurantId String?
+  restaurant   Restaurant?   @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  orders       Order[]
+  reservations Reservation[]
+
+  @@map("customers")
+  @@index([restaurantId, email])
+  @@index([restaurantId, phone])
+  @@index([restaurantId, deletedAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// MENU ITEMS
+// ════════════════════════════════════════════════════════════════
+
+model MenuItem {
+  id              String    @id @default(uuid())
+  name            String
+  description     String?
+  category        Category
+  price           Decimal   @db.Decimal(10, 2)
+  available       Boolean   @default(true)
+  imageUrl        String?
+  allergens       String[]  // Array: ["dairy", "gluten", "nuts"]
+  prepTimeMinutes Int       @default(15)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime? // ✅ Soft delete
+
+  // Relations
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+  recipeItems  RecipeItem[] // For inventory management
+
+  @@map("menu_items")
+  @@index([restaurantId, category])
+  @@index([restaurantId, available])
+  @@index([restaurantId, deletedAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// TABLES
+// ════════════════════════════════════════════════════════════════
+
+model Table {
+  id        String      @id @default(uuid())
+  number    Int         // ✅ Not globally unique - unique per restaurant
+  capacity  Int
+  status    TableStatus @default(AVAILABLE)
+  location  String?     // e.g., "Main Floor", "Patio", "Private Room"
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  deletedAt DateTime?   // ✅ Soft delete
+
+  // Relations
+  restaurantId String
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders       Order[]
+  reservations Reservation[]
+
+  @@unique([restaurantId, number]) // ✅ FIXED: Table number unique per restaurant
+  @@map("tables")
+  @@index([restaurantId, status])
+  @@index([restaurantId, deletedAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// ORDERS (With timeline tracking & delivery support)
+// ════════════════════════════════════════════════════════════════
+
+model Order {
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique
+  tableId         String?
+  customerId      String?
+  employeeId      String?
+  status          OrderStatus @default(PENDING)
+  orderType       OrderType   @default(DINE_IN)
   
-  @@map("staff")
+  // Pricing
+  subtotal        Decimal     @db.Decimal(10, 2)
+  tax             Decimal     @db.Decimal(10, 2)
+  tip             Decimal     @db.Decimal(10, 2) @default(0)
+  total           Decimal     @db.Decimal(10, 2)
+  
+  // Delivery specific
+  deliveryAddress String?
+  deliveryFee     Decimal?    @db.Decimal(10, 2)
+  
+  // Timeline tracking (for analytics & customer updates)
+  estimatedTime   DateTime?
+  placedAt        DateTime?   // When customer placed order
+  acceptedAt      DateTime?   // When restaurant accepted
+  preparedAt      DateTime?   // When kitchen finished
+  servedAt        DateTime?   // When served to customer (dine-in)
+  deliveredAt     DateTime?   // When delivered (delivery orders)
+  
+  // Metadata
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  completedAt     DateTime?
+  deletedAt       DateTime?   // ✅ Soft delete
+
+  // Relations
+  table        Table?      @relation(fields: [tableId], references: [id])
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  employee     Employee?   @relation(fields: [employeeId], references: [id])
+  items        OrderItem[]
+  payments     Payment[]
+  delivery     Delivery?
+  
+  restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, orderNumber]) // Ensures unique order numbers per restaurant
+  @@map("orders")
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@index([customerId, createdAt(sort: Desc)])
+  @@index([restaurantId, deletedAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// ORDER ITEMS
+// ════════════════════════════════════════════════════════════════
+
+model OrderItem {
+  id                  String   @id @default(uuid())
+  orderId             String
+  menuItemId          String
+  quantity            Int
+  price               Decimal  @db.Decimal(10, 2) // Price at time of order (historical)
+  specialInstructions String?
+  createdAt           DateTime @default(now())
+
+  // Relations
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@map("order_items")
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// RESERVATIONS
+// ════════════════════════════════════════════════════════════════
+
+model Reservation {
+  id              String            @id @default(uuid())
+  customerId      String
+  tableId         String?
+  date            DateTime          // Reservation date
+  time            String            // Reservation time (e.g., "19:30")
+  partySize       Int               // Number of guests
+  status          ReservationStatus @default(PENDING)
+  specialRequests String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?         // ✅ Soft delete
+
+  // Relations
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  table        Table?     @relation(fields: [tableId], references: [id])
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("reservations")
+  @@index([restaurantId, date])
+  @@index([customerId, date])
+  @@index([restaurantId, deletedAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// PAYMENTS (Separate payment tracking)
+// ════════════════════════════════════════════════════════════════
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        // Multiple payments per order allowed (split bills)
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       // External payment gateway transaction ID
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?     // ✅ Soft delete
+
+  // Relations
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+  @@index([orderId])
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@index([restaurantId, deletedAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// INVENTORY MANAGEMENT
+// ════════════════════════════════════════════════════════════════
+
+model Ingredient {
+  id          String    @id @default(uuid())
+  name        String
+  unit        String    // e.g., "kg", "liter", "piece"
+  costPerUnit Decimal   @db.Decimal(10, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // ✅ Soft delete
+
+  // Relations
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  inventory    Inventory?
+  recipeItems  RecipeItem[]
+
+  @@map("ingredients")
+  @@index([restaurantId, name])
+  @@index([restaurantId, deletedAt])
+}
+
+model Inventory {
+  id                String    @id @default(uuid())
+  ingredientId      String    @unique
+  stockLevel        Float     // Current stock (e.g., 10.5 kg)
+  lowStockThreshold Float     @default(5) // Alert when below this
+  lastUpdated       DateTime  @updatedAt
+  deletedAt         DateTime? // ✅ Soft delete
+
+  // Relations
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("inventory")
+  @@index([restaurantId, stockLevel]) // For low stock alerts
+  @@index([restaurantId, deletedAt])
+}
+
+model RecipeItem {
+  id           String @id @default(uuid())
+  menuItemId   String
+  ingredientId String
+  quantity     Float  // Amount needed per serving (e.g., 0.2 kg)
+
+  // Relations
+  menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, ingredientId]) // One ingredient per menu item
+  @@map("recipe_items")
+  @@index([menuItemId])
+  @@index([ingredientId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// DELIVERY TRACKING
+// ════════════════════════════════════════════════════════════════
+
+model Delivery {
+  id          String         @id @default(uuid())
+  orderId     String         @unique // One delivery per order
+  driverId    String?        // Future: Link to Driver model
+  status      DeliveryStatus @default(PENDING)
+  trackingUrl String?        // e.g., Google Maps link
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?      // ✅ Soft delete
+
+  // Relations
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("deliveries")
+  @@index([orderId])
+  @@index([restaurantId, status])
+  @@index([restaurantId, deletedAt])
 }
