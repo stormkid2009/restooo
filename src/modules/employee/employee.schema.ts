@@ -1,11 +1,11 @@
-// src/features/user/user.schema.ts
+// src/modules/employee/employee.schema.ts
 import { z } from "zod";
 
 /**
- * Create User Schema
- * Used by ADMIN to create new users
+ * Create Employee Schema
+ * Used by ADMIN to create new employees
  */
-export const createUserSchema = z.object({
+export const createEmployeeSchema = z.object({
   email: z
     .string()
     .min(1, { error: "Email is required" })
@@ -21,18 +21,24 @@ export const createUserSchema = z.object({
     .min(1, { error: "Name is required" })
     .min(2, { error: "Name must be at least 2 characters long" }),
 
+  phone: z.string().optional(),
+
   role: z.enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
     error: "Role must be ADMIN, MANAGER, STAFF, or CHEF",
-  }),
+  }).optional().default("STAFF"),
+
+  shift: z.string().optional(),
+
+  restaurantId: z.string().uuid({ error: "Invalid restaurant ID format" }).optional(),
 
   active: z.boolean().optional(),
 });
 
 /**
- * Update User Schema
+ * Update Employee Schema
  * All fields optional for partial updates
  */
-export const updateUserSchema = z.object({
+export const updateEmployeeSchema = z.object({
   email: z
     .string()
     .email({ error: "Invalid email format" })
@@ -42,6 +48,8 @@ export const updateUserSchema = z.object({
     .string()
     .min(2, { error: "Name must be at least 2 characters long" })
     .optional(),
+
+  phone: z.string().optional(),
 
   role: z
     .enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
@@ -49,29 +57,15 @@ export const updateUserSchema = z.object({
     })
     .optional(),
 
+  shift: z.string().optional(),
+
   active: z.boolean().optional(),
 });
 
 /**
- * Update Profile Schema
- * Users updating their own profile (limited fields)
+ * Query/Filter Schema for listing employees
  */
-export const updateProfileSchema = z.object({
-  name: z
-    .string()
-    .min(2, { error: "Name must be at least 2 characters long" })
-    .optional(),
-
-  email: z
-    .string()
-    .email({ error: "Invalid email format" })
-    .optional(),
-});
-
-/**
- * Query/Filter Schema
- */
-export const userQuerySchema = z.object({
+export const employeeQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
   role: z.enum(["ADMIN", "MANAGER", "STAFF", "CHEF"], {
@@ -88,26 +82,29 @@ export const userQuerySchema = z.object({
 });
 
 /**
- * User ID Param Schema
+ * Employee ID Param Schema
  */
-export const userIdSchema = z.object({
-  id: z.string().uuid({ error: "Invalid user ID format" }),
+export const employeeIdSchema = z.object({
+  id: z.string().uuid({ error: "Invalid employee ID format" }),
 });
 
 // TypeScript Types
-export type CreateUserInput = z.infer<typeof createUserSchema>;
-export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
-export type UserQueryInput = z.infer<typeof userQuerySchema>;
-export type UserIdInput = z.infer<typeof userIdSchema>;
+export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
+export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
+export type EmployeeQueryInput = z.infer<typeof employeeQuerySchema>;
+export type EmployeeIdInput = z.infer<typeof employeeIdSchema>;
 
-// User Response Type (reusable across features)
-export interface UserResponse {
+// Employee Response Type (excludes password)
+export interface EmployeeResponse {
   id: string;
   email: string;
   name: string;
+  phone: string | null;
   role: string;
+  shift: string | null;
+  hireDate: Date;
   active: boolean;
+  restaurantId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

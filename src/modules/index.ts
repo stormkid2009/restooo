@@ -2,7 +2,7 @@
 import { Router } from "express";
 import authRoutes from "./auth/auth.routes";
 import menuRoutes from "./menu/menu.routes";
-import userRoutes from "./user/user.routes";
+import employeeRoutes from "./employee/employee.routes";
 
 // Future route imports
 // import orderRoutes from './orderRoutes';
@@ -26,11 +26,16 @@ const router = Router();
 router.use("/auth", authRoutes);
 
 /**
- *  User Routes
- *  @prefix /api/v1/user
+ *  Employee Routes
+ *  @prefix /api/v1/employee
  *  @routes
+ *   - GET / - List all employees
+ *   - GET /:id - Get single employee
+ *   - POST / - Create employee (ADMIN)
+ *   - PUT /:id - Update employee (ADMIN, MANAGER)
+ *   - DELETE /:id - Delete employee (ADMIN)
  */
-router.use("/user",userRoutes);
+router.use("/employee", employeeRoutes);
 
 /**
  * Menu Management Routes

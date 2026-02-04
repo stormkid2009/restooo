@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import userService from "../modules/user/user.service";
+import employeeService from "../modules/employee/employee.service";
 
 /**
- * Extended Request with user info
+ * Extended Request with user info (Employee data)
  */
 export type AuthRequest = Request & {
   user: {
@@ -12,16 +12,19 @@ export type AuthRequest = Request & {
     name: string;
     role: string;
     active: boolean;
+    restaurantId: string | null;
   };
 };
 
 /**
  * JWT Payload Interface
+ * Includes restaurantId for multi-tenancy
  */
 interface JWTPayload {
   userId: string;
   email: string;
   role: string;
+  restaurantId: string | null;
   iat: number;
   exp: number;
 }
@@ -80,21 +83,21 @@ export const authenticate = async (
       throw error;
     }
 
-    // Get fresh user data from database
-    const userResult = await userService.getUserById(decoded.userId);
+    // Get fresh employee data from database
+    const employeeResult = await employeeService.getEmployeeById(decoded.userId);
 
-    if (!userResult.success) {
+    if (!employeeResult.success) {
       res.status(401).json({
         success: false,
-        message: "User not found",
+        message: "Employee not found",
       });
       return;
     }
 
-    const user = userResult.data;
+    const employee = employeeResult.data;
 
-    // Check if user is active
-    if (!user.active) {
+    // Check if employee is active
+    if (!employee.active) {
       res.status(403).json({
         success: false,
         message: "Account is deactivated",
@@ -102,8 +105,8 @@ export const authenticate = async (
       return;
     }
 
-    // Attach user to request
-    (req as any).user = user;
+    // Attach employee to request
+    (req as any).user = employee;
 
     next();
   } catch (error) {

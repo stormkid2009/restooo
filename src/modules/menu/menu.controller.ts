@@ -1,4 +1,4 @@
-// src/controllers/menuController.ts
+// src/modules/menu/menu.controller.ts
 import { Request, Response } from "express";
 import menuService from "./menu.service";
 
@@ -6,8 +6,7 @@ import menuService from "./menu.service";
  * Menu Controller
  *
  * Handles HTTP requests and responses for menu management
- * Controllers are THIN - they just handle HTTP stuff
- * Business logic lives in the service layer
+ * Uses restaurantId from authenticated user for multi-tenancy
  */
 const menuController = {
   /**
@@ -15,15 +14,18 @@ const menuController = {
    *
    * @route POST /api/v1/menu
    * @access Private (ADMIN, MANAGER)
-   *
-   * @param req - Express request with validated body
-   * @param res - Express response
-   *
-   * @returns 201 - Menu item created
-   * @returns 400 - Failed to create
    */
   create: async (req: Request, res: Response) => {
-    const result = await menuService.create(req.body);
+    const restaurantId = (req as any).user?.restaurantId;
+
+    if (!restaurantId) {
+      return res.status(400).json({
+        status: "error",
+        message: "Restaurant context required",
+      });
+    }
+
+    const result = await menuService.create(req.body, restaurantId);
 
     if (!result.success) {
       return res.status(400).json({
@@ -39,31 +41,16 @@ const menuController = {
   },
 
   /**
-   * List all menu items with filters
+   * List menu items with filters
    *
    * @route GET /api/v1/menu
-   * @access Public
-   *
-   * Query params:
-   * - category: Filter by category
-   * - available: Filter by availability (true/false)
-   * - minPrice: Minimum price
-   * - maxPrice: Maximum price
-   * - search: Search by name
-   * - limit: Items per page (default 20, max 100)
-   * - offset: Items to skip (default 0)
-   *
-   * @param req - Express request with query params
-   * @param res - Express response
-   *
-   * @returns 200 - List of menu items with pagination
+   * @access Public (shows restaurant's menu if authenticated, all if not)
    */
   list: async (req: Request, res: Response) => {
-    // Use validatedQuery (transformed by validateQuery middleware)
-    // Falls back to req.query if validation middleware not used
     const filters = (req as any).validatedQuery || req.query;
+    const restaurantId = (req as any).user?.restaurantId;
 
-    const result = await menuService.list(filters);
+    const result = await menuService.list(filters, restaurantId);
 
     if (!result.success) {
       return res.status(400).json({
@@ -84,15 +71,11 @@ const menuController = {
    *
    * @route GET /api/v1/menu/:id
    * @access Public
-   *
-   * @param req - Express request with id param
-   * @param res - Express response
-   *
-   * @returns 200 - Menu item found
-   * @returns 404 - Menu item not found
    */
   getById: async (req: Request, res: Response) => {
-    const result = await menuService.getById(req.params.id);
+    const restaurantId = (req as any).user?.restaurantId;
+
+    const result = await menuService.getById(req.params.id, restaurantId);
 
     if (!result.success) {
       return res.status(404).json({
@@ -112,19 +95,20 @@ const menuController = {
    *
    * @route PUT /api/v1/menu/:id
    * @access Private (ADMIN, MANAGER)
-   *
-   * @param req - Express request with id param and body
-   * @param res - Express response
-   *
-   * @returns 200 - Menu item updated
-   * @returns 404 - Menu item not found
-   * @returns 400 - Update failed
    */
   update: async (req: Request, res: Response) => {
-    const result = await menuService.update(req.params.id, req.body);
+    const restaurantId = (req as any).user?.restaurantId;
+
+    if (!restaurantId) {
+      return res.status(400).json({
+        status: "error",
+        message: "Restaurant context required",
+      });
+    }
+
+    const result = await menuService.update(req.params.id, req.body, restaurantId);
 
     if (!result.success) {
-      // Check if error is "not found" or other error
       const statusCode = result.error === "Menu item not found" ? 404 : 400;
 
       return res.status(statusCode).json({
@@ -140,23 +124,24 @@ const menuController = {
   },
 
   /**
-   * Delete menu item
+   * Delete menu item (soft delete)
    *
    * @route DELETE /api/v1/menu/:id
    * @access Private (ADMIN only)
-   *
-   * @param req - Express request with id param
-   * @param res - Express response
-   *
-   * @returns 204 - Menu item deleted (no content)
-   * @returns 404 - Menu item not found
-   * @returns 400 - Delete failed
    */
   delete: async (req: Request, res: Response) => {
-    const result = await menuService.delete(req.params.id);
+    const restaurantId = (req as any).user?.restaurantId;
+
+    if (!restaurantId) {
+      return res.status(400).json({
+        status: "error",
+        message: "Restaurant context required",
+      });
+    }
+
+    const result = await menuService.delete(req.params.id, restaurantId);
 
     if (!result.success) {
-      // Check if error is "not found" or other error
       const statusCode = result.error === "Menu item not found" ? 404 : 400;
 
       return res.status(statusCode).json({
@@ -165,7 +150,6 @@ const menuController = {
       });
     }
 
-    // 204 No Content - successful deletion
     return res.status(204).send();
   },
 };

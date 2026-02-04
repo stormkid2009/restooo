@@ -2,8 +2,8 @@
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
 import { LoginInput, RegisterInput } from "./auth.schema";
-import userService from "../user/user.service";
-import { UserResponse } from "../user/user.schema";
+import employeeService from "../employee/employee.service";
+import { EmployeeResponse } from "../employee/employee.schema";
 import { comparePasswords } from "../../utils/encryption";
 
 /**
@@ -17,18 +17,20 @@ type ServiceResponse<T> =
  * Auth Response Type
  */
 interface AuthResponse {
-  user: UserResponse;
+  user: EmployeeResponse;
   token: string;
   refreshToken?: string;
 }
 
 /**
  * Token Payload Interface
+ * Includes restaurantId for multi-tenancy
  */
 interface TokenPayload {
   userId: string;
   email: string;
   role: string;
+  restaurantId: string | null;
 }
 
 /**
@@ -49,38 +51,40 @@ class AuthService {
    */
   async register(data: RegisterInput): Promise<ServiceResponse<AuthResponse>> {
     try {
-      // Delegate user creation to UserService
-      const userResult = await userService.createUser({
+      // Delegate employee creation to EmployeeService
+      const employeeResult = await employeeService.createEmployee({
         email: data.email,
         password: data.password,
         name: data.name,
         role: data.role,
       });
 
-      if (!userResult.success) {
+      if (!employeeResult.success) {
         return {
           success: false,
-          error: userResult.error,
+          error: employeeResult.error,
         };
       }
 
       // Generate tokens for immediate login
       const token = this.generateAccessToken({
-        userId: userResult.data.id,
-        email: userResult.data.email,
-        role: userResult.data.role,
+        userId: employeeResult.data.id,
+        email: employeeResult.data.email,
+        role: employeeResult.data.role,
+        restaurantId: employeeResult.data.restaurantId,
       });
 
       const refreshToken = this.generateRefreshToken({
-        userId: userResult.data.id,
-        email: userResult.data.email,
-        role: userResult.data.role,
+        userId: employeeResult.data.id,
+        email: employeeResult.data.email,
+        role: employeeResult.data.role,
+        restaurantId: employeeResult.data.restaurantId,
       });
 
       return {
         success: true,
         data: {
-          user: userResult.data,
+          user: employeeResult.data,
           token,
           refreshToken,
         },
@@ -104,20 +108,20 @@ class AuthService {
    */
   async login(data: LoginInput): Promise<ServiceResponse<AuthResponse>> {
     try {
-      // Get user with password via UserService
-      const userResult = await userService.getUserByEmail(data.email, true);
+      // Get employee with password via EmployeeService
+      const employeeResult = await employeeService.getEmployeeByEmail(data.email, true);
 
-      if (!userResult.success) {
+      if (!employeeResult.success) {
         return {
           success: false,
           error: "Invalid credentials",
         };
       }
 
-      const user = userResult.data;
+      const employee = employeeResult.data;
 
-      // Check if user is active
-      if (!user.active) {
+      // Check if employee is active
+      if (!employee.active) {
         return {
           success: false,
           error: "Account is deactivated. Please contact support.",
@@ -127,7 +131,7 @@ class AuthService {
       // Verify password
       const isPasswordValid = await comparePasswords(
         data.password,
-        user.password!,
+        employee.password!,
       );
 
       if (!isPasswordValid) {
@@ -138,25 +142,27 @@ class AuthService {
       }
 
       // Remove password from response
-      const { password, ...userWithoutPassword } = user;
+      const { password, ...employeeWithoutPassword } = employee;
 
       // Generate tokens
       const token = this.generateAccessToken({
-        userId: user.id,
-        email: user.email,
-        role: user.role,
+        userId: employee.id,
+        email: employee.email,
+        role: employee.role,
+        restaurantId: employee.restaurantId,
       });
 
       const refreshToken = this.generateRefreshToken({
-        userId: user.id,
-        email: user.email,
-        role: user.role,
+        userId: employee.id,
+        email: employee.email,
+        role: employee.role,
+        restaurantId: employee.restaurantId,
       });
 
       return {
         success: true,
         data: {
-          user: userWithoutPassword,
+          user: employeeWithoutPassword,
           token,
           refreshToken,
         },
@@ -205,6 +211,7 @@ class AuthService {
         userId: payload.userId,
         email: payload.email,
         role: payload.role,
+        restaurantId: payload.restaurantId,
       },
       secret,
       { expiresIn },
@@ -226,6 +233,7 @@ class AuthService {
         userId: payload.userId,
         email: payload.email,
         role: payload.role,
+        restaurantId: payload.restaurantId,
       },
       secret,
       { expiresIn: "7d" },
@@ -252,6 +260,7 @@ class AuthService {
         userId: decoded.userId,
         email: decoded.email,
         role: decoded.role,
+        restaurantId: decoded.restaurantId,
       });
 
       return {

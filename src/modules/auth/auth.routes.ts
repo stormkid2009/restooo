@@ -10,14 +10,9 @@ const router = Router();
 /**
  * Auth Routes
  * Public endpoints (no authentication required)
+ * NOTE: Employee registration is NOT public. Employees are created via
+ * POST /api/v1/employee (requires ADMIN role)
  */
-
-// POST /api/v1/auth/register
-router.post(
-  "/register",
-  validateRequest(registerSchema),
-  authController.register,
-);
 
 // POST /api/v1/auth/login
 router.post("/login", validateRequest(loginSchema), authController.login);

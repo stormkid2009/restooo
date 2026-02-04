@@ -1,26 +1,25 @@
-// src/features/user/user.controller.ts
+// src/modules/employee/employee.controller.ts
 import { Request, Response } from "express";
-import userService from "./user.service";
+import employeeService from "./employee.service";
 import {
-  CreateUserInput,
-  UpdateUserInput,
-  UpdateProfileInput,
-  UserQueryInput,
-} from "./user.schema";
+  CreateEmployeeInput,
+  UpdateEmployeeInput,
+  EmployeeQueryInput,
+} from "./employee.schema";
 
 /**
- * UserController
- * Handles HTTP requests for user management
+ * EmployeeController
+ * Handles HTTP requests for employee management
  */
-class UserController {
+class EmployeeController {
   /**
-   * Get all users with filtering and pagination
-   * GET /api/v1/users
+   * Get all employees with filtering and pagination
+   * GET /api/v1/employee
    * Requires ADMIN or MANAGER role
    */
-  async getUsers(req: Request, res: Response): Promise<void> {
+  async getEmployees(req: Request, res: Response): Promise<void> {
     try {
-      const query: UserQueryInput = {
+      const query: EmployeeQueryInput = {
         page: req.query.page ? Number(req.query.page) : 1,
         limit: req.query.limit ? Number(req.query.limit) : 10,
         role: req.query.role as any,
@@ -30,7 +29,10 @@ class UserController {
         sortOrder: req.query.sortOrder as any,
       };
 
-      const result = await userService.getUsers(query);
+      // Get restaurantId from authenticated user for multi-tenancy
+      const restaurantId = (req as any).user?.restaurantId;
+
+      const result = await employeeService.getEmployees(query, restaurantId);
 
       if (!result.success) {
         res.status(400).json({
@@ -45,7 +47,7 @@ class UserController {
         ...result.data,
       });
     } catch (error) {
-      console.error("Get users controller error:", error);
+      console.error("Get employees controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -54,15 +56,15 @@ class UserController {
   }
 
   /**
-   * Get single user by ID
-   * GET /api/v1/users/:id
+   * Get single employee by ID
+   * GET /api/v1/employee/:id
    * Requires ADMIN or MANAGER role
    */
-  async getUserById(req: Request, res: Response): Promise<void> {
+  async getEmployeeById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
 
-      const result = await userService.getUserById(id);
+      const result = await employeeService.getEmployeeById(id);
 
       if (!result.success) {
         res.status(404).json({
@@ -77,7 +79,7 @@ class UserController {
         data: result.data,
       });
     } catch (error) {
-      console.error("Get user controller error:", error);
+      console.error("Get employee controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -86,15 +88,20 @@ class UserController {
   }
 
   /**
-   * Create new user
-   * POST /api/v1/users
+   * Create new employee
+   * POST /api/v1/employee
    * Requires ADMIN role
    */
-  async createUser(req: Request, res: Response): Promise<void> {
+  async createEmployee(req: Request, res: Response): Promise<void> {
     try {
-      const data: CreateUserInput = req.body;
+      const data: CreateEmployeeInput = req.body;
 
-      const result = await userService.createUser(data);
+      // If no restaurantId provided, use the one from the authenticated admin
+      if (!data.restaurantId) {
+        data.restaurantId = (req as any).user?.restaurantId;
+      }
+
+      const result = await employeeService.createEmployee(data);
 
       if (!result.success) {
         res.status(400).json({
@@ -106,11 +113,11 @@ class UserController {
 
       res.status(201).json({
         success: true,
-        message: "User created successfully",
+        message: "Employee created successfully",
         data: result.data,
       });
     } catch (error) {
-      console.error("Create user controller error:", error);
+      console.error("Create employee controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -119,50 +126,16 @@ class UserController {
   }
 
   /**
-   * Update user by ID
-   * PUT /api/v1/users/:id
+   * Update employee by ID
+   * PUT /api/v1/employee/:id
    * Requires ADMIN or MANAGER role
    */
-  async updateUser(req: Request, res: Response): Promise<void> {
+  async updateEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const data: UpdateUserInput = req.body;
+      const data: UpdateEmployeeInput = req.body;
 
-      const result = await userService.updateUser(id, data);
-
-      if (!result.success) {
-        res.status(400).json({
-          success: false,
-          message: result.error,
-        });
-        return;
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "User updated successfully",
-        data: result.data,
-      });
-    } catch (error) {
-      console.error("Update user controller error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
-    }
-  }
-
-  /**
-   * Update own profile
-   * PATCH /api/v1/users/profile
-   * Requires authentication
-   */
-  async updateProfile(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = (req as any).user.id;
-      const data: UpdateProfileInput = req.body;
-
-      const result = await userService.updateProfile(userId, data);
+      const result = await employeeService.updateEmployee(id, data);
 
       if (!result.success) {
         res.status(400).json({
@@ -174,11 +147,11 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: "Profile updated successfully",
+        message: "Employee updated successfully",
         data: result.data,
       });
     } catch (error) {
-      console.error("Update profile controller error:", error);
+      console.error("Update employee controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -187,15 +160,15 @@ class UserController {
   }
 
   /**
-   * Delete user (soft delete)
-   * DELETE /api/v1/users/:id
+   * Delete employee (soft delete)
+   * DELETE /api/v1/employee/:id
    * Requires ADMIN role
    */
-  async deleteUser(req: Request, res: Response): Promise<void> {
+  async deleteEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
 
-      const result = await userService.deleteUser(id);
+      const result = await employeeService.deleteEmployee(id);
 
       if (!result.success) {
         res.status(400).json({
@@ -207,10 +180,10 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: "User deleted successfully",
+        message: "Employee deleted successfully",
       });
     } catch (error) {
-      console.error("Delete user controller error:", error);
+      console.error("Delete employee controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -219,15 +192,15 @@ class UserController {
   }
 
   /**
-   * Activate user
-   * PATCH /api/v1/users/:id/activate
+   * Activate employee
+   * PATCH /api/v1/employee/:id/activate
    * Requires ADMIN role
    */
-  async activateUser(req: Request, res: Response): Promise<void> {
+  async activateEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
 
-      const result = await userService.activateUser(id);
+      const result = await employeeService.activateEmployee(id);
 
       if (!result.success) {
         res.status(400).json({
@@ -239,11 +212,11 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: "User activated successfully",
+        message: "Employee activated successfully",
         data: result.data,
       });
     } catch (error) {
-      console.error("Activate user controller error:", error);
+      console.error("Activate employee controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -252,15 +225,15 @@ class UserController {
   }
 
   /**
-   * Deactivate user
-   * PATCH /api/v1/users/:id/deactivate
+   * Deactivate employee
+   * PATCH /api/v1/employee/:id/deactivate
    * Requires ADMIN role
    */
-  async deactivateUser(req: Request, res: Response): Promise<void> {
+  async deactivateEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
 
-      const result = await userService.deactivateUser(id);
+      const result = await employeeService.deactivateEmployee(id);
 
       if (!result.success) {
         res.status(400).json({
@@ -272,11 +245,11 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: "User deactivated successfully",
+        message: "Employee deactivated successfully",
         data: result.data,
       });
     } catch (error) {
-      console.error("Deactivate user controller error:", error);
+      console.error("Deactivate employee controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -285,4 +258,4 @@ class UserController {
   }
 }
 
-export default new UserController();
+export default new EmployeeController();
