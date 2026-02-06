@@ -166,7 +166,7 @@ class AuthController {
    */
   async changePassword(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).user?.userId;
+      const userId = (req as any).user?.id;
       const data: ChangePasswordInput = req.body;
 
       if (!userId) {
