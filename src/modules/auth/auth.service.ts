@@ -1,10 +1,11 @@
 // src/modules/auth/auth.service.ts
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
-import { LoginInput, RegisterInput } from "./auth.schema";
+import { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema";
 import employeeService from "../employee/employee.service";
 import { EmployeeResponse } from "../employee/employee.schema";
-import { comparePasswords } from "../../utils/encryption";
+import { comparePasswords, hashPassword } from "../../utils/encryption";
+import prisma from "../../config/database";
 
 /**
  * Service Response Type
@@ -272,6 +273,62 @@ class AuthService {
       return {
         success: false,
         error: "Invalid or expired refresh token",
+      };
+    }
+  }
+
+  /**
+   * Change password for authenticated user
+   * Requires current password verification
+   */
+  async changePassword(
+    userId: string,
+    data: ChangePasswordInput
+  ): Promise<ServiceResponse<{ message: string }>> {
+    try {
+      // Get employee with password
+      const employeeResult = await employeeService.getEmployeeById(userId, true);
+
+      if (!employeeResult.success) {
+        return {
+          success: false,
+          error: "User not found",
+        };
+      }
+
+      const employee = employeeResult.data;
+
+      // Verify current password
+      const isCurrentPasswordValid = await comparePasswords(
+        data.currentPassword,
+        employee.password!
+      );
+
+      if (!isCurrentPasswordValid) {
+        return {
+          success: false,
+          error: "Current password is incorrect",
+        };
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(data.newPassword);
+
+      // Update password in database
+      await prisma.employee.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      });
+
+      return {
+        success: true,
+        data: { message: "Password changed successfully" },
+      };
+    } catch (error) {
+      console.error("Change password error:", error);
+      return {
+        success: false,
+        error: "Failed to change password. Please try again.",
       };
     }
   }

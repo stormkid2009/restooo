@@ -10,6 +10,7 @@ import {
   updateEmployeeSchema,
   employeeQuerySchema,
   employeeIdSchema,
+  adminResetPasswordSchema,
 } from "./employee.schema";
 
 const router = Router();
@@ -55,6 +56,16 @@ router.put(
   validateRequest(employeeIdSchema, "params"),
   validateRequest(updateEmployeeSchema),
   employeeController.updateEmployee,
+);
+
+// PATCH /api/v1/employee/:id/password - Reset employee password (ADMIN only)
+router.patch(
+  "/:id/password",
+  authenticate,
+  authorize(["ADMIN"]),
+  validateRequest(employeeIdSchema, "params"),
+  validateRequest(adminResetPasswordSchema),
+  employeeController.resetPassword,
 );
 
 // DELETE /api/v1/employee/:id - Delete employee (ADMIN only)

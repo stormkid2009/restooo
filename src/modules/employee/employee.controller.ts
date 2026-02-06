@@ -5,6 +5,7 @@ import {
   CreateEmployeeInput,
   UpdateEmployeeInput,
   EmployeeQueryInput,
+  AdminResetPasswordInput,
 } from "./employee.schema";
 
 /**
@@ -250,6 +251,40 @@ class EmployeeController {
       });
     } catch (error) {
       console.error("Deactivate employee controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  /**
+   * Reset employee password
+   * PATCH /api/v1/employee/:id/password
+   * Requires ADMIN role
+   */
+  async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const data: AdminResetPasswordInput = req.body;
+
+      const result = await employeeService.resetEmployeePassword(id, data);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          message: result.error,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Password reset successfully",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Reset password controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

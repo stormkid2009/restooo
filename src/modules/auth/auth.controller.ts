@@ -1,7 +1,7 @@
 // src/modules/auth/auth.controller.ts
 import { Request, Response } from "express";
 import authService from "./auth.service";
-import { LoginInput, RegisterInput } from "./auth.schema";
+import { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema";
 
 /**
  * AuthController
@@ -152,6 +152,47 @@ class AuthController {
       });
     } catch (error) {
       console.error("Refresh controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  /**
+   * Change password for authenticated user
+   * PATCH /api/v1/auth/change-password
+   * Requires authentication
+   */
+  async changePassword(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.userId;
+      const data: ChangePasswordInput = req.body;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          message: "Authentication required",
+        });
+        return;
+      }
+
+      const result = await authService.changePassword(userId, data);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          message: result.error,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: result.data.message,
+      });
+    } catch (error) {
+      console.error("Change password controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

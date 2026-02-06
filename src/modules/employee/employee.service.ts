@@ -6,6 +6,7 @@ import {
   UpdateEmployeeInput,
   EmployeeQueryInput,
   EmployeeResponse,
+  AdminResetPasswordInput,
 } from "./employee.schema";
 
 /**
@@ -426,6 +427,52 @@ class EmployeeService {
     employeeId: string
   ): Promise<ServiceResponse<EmployeeResponse>> {
     return this.updateEmployee(employeeId, { active: false });
+  }
+
+  /**
+   * Reset employee password (admin operation)
+   * No current password required
+   */
+  async resetEmployeePassword(
+    employeeId: string,
+    data: AdminResetPasswordInput
+  ): Promise<ServiceResponse<EmployeeResponse>> {
+    try {
+      // Check if employee exists
+      const existingEmployee = await prisma.employee.findUnique({
+        where: { id: employeeId },
+      });
+
+      if (!existingEmployee) {
+        return {
+          success: false,
+          error: "Employee not found",
+        };
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(data.newPassword);
+
+      // Update password
+      const employee = await prisma.employee.update({
+        where: { id: employeeId },
+        data: { password: hashedPassword },
+      });
+
+      // Remove password from response
+      const { password, ...employeeWithoutPassword } = employee;
+
+      return {
+        success: true,
+        data: employeeWithoutPassword,
+      };
+    } catch (error) {
+      console.error("Reset password error:", error);
+      return {
+        success: false,
+        error: "Failed to reset password",
+      };
+    }
   }
 
   /**

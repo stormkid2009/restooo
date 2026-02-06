@@ -3,7 +3,7 @@ import { Router } from "express";
 import authController from "./auth.controller";
 import { validateRequest } from "../../middleware/validateRequest";
 import { authenticate } from "../../middleware/authenticate";
-import { loginSchema, registerSchema, refreshTokenSchema } from "./auth.schema";
+import { changePasswordSchema, loginSchema, registerSchema, refreshTokenSchema } from "./auth.schema";
 
 const router = Router();
 
@@ -34,5 +34,13 @@ router.get("/me", authenticate, authController.me);
 
 // POST /api/v1/auth/logout - Logout current user
 router.post("/logout", authenticate, authController.logout);
+
+// PATCH /api/v1/auth/change-password - Change password (authenticated)
+router.patch(
+  "/change-password",
+  authenticate,
+  validateRequest(changePasswordSchema),
+  authController.changePassword,
+);
 
 export default router;

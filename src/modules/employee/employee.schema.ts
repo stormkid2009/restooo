@@ -88,11 +88,23 @@ export const employeeIdSchema = z.object({
   id: z.string().uuid({ error: "Invalid employee ID format" }),
 });
 
+/**
+ * Admin Password Reset Schema
+ * Used by ADMIN to reset employee passwords (no current password required)
+ */
+export const adminResetPasswordSchema = z.object({
+  newPassword: z
+    .string()
+    .min(1, { error: "Password is required" })
+    .min(6, { error: "Password must be at least 6 characters long" }),
+});
+
 // TypeScript Types
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 export type EmployeeQueryInput = z.infer<typeof employeeQuerySchema>;
 export type EmployeeIdInput = z.infer<typeof employeeIdSchema>;
+export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
 
 // Employee Response Type (excludes password)
 export interface EmployeeResponse {
