@@ -11,14 +11,14 @@ declare global {
        * User information extracted from JWT token
        * Available after authMiddleware runs successfully
        */
-      user?: {
-        userId: string;
-        email: string;
-        role: string;
-      };
+      /**
+       * User information extracted from JWT token
+       * Available after authMiddleware runs successfully
+       */
+      user?: import("../auth").AppUser;
     }
   }
 }
 
 // This export is required for the declaration to work
-export {};
+export { };

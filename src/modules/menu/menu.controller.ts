@@ -16,7 +16,8 @@ const menuController = {
    * @access Private (ADMIN, MANAGER)
    */
   create: async (req: Request, res: Response) => {
-    const restaurantId = (req as any).user?.restaurantId;
+    const user = req.user;
+    const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
     if (!restaurantId) {
       return res.status(400).json({
@@ -48,7 +49,8 @@ const menuController = {
    */
   list: async (req: Request, res: Response) => {
     const filters = (req as any).validatedQuery || req.query;
-    const restaurantId = (req as any).user?.restaurantId;
+    const user = req.user;
+    const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
     const result = await menuService.list(filters, restaurantId);
 
@@ -73,7 +75,8 @@ const menuController = {
    * @access Public
    */
   getById: async (req: Request, res: Response) => {
-    const restaurantId = (req as any).user?.restaurantId;
+    const user = req.user;
+    const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
     const result = await menuService.getById(req.params.id, restaurantId);
 
@@ -97,7 +100,8 @@ const menuController = {
    * @access Private (ADMIN, MANAGER)
    */
   update: async (req: Request, res: Response) => {
-    const restaurantId = (req as any).user?.restaurantId;
+    const user = req.user;
+    const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
     if (!restaurantId) {
       return res.status(400).json({
@@ -130,7 +134,8 @@ const menuController = {
    * @access Private (ADMIN only)
    */
   delete: async (req: Request, res: Response) => {
-    const restaurantId = (req as any).user?.restaurantId;
+    const user = req.user;
+    const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
     if (!restaurantId) {
       return res.status(400).json({

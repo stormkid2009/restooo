@@ -31,7 +31,8 @@ class EmployeeController {
       };
 
       // Get restaurantId from authenticated user for multi-tenancy
-      const restaurantId = (req as any).user?.restaurantId;
+      const user = req.user;
+      const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
       const result = await employeeService.getEmployees(query, restaurantId);
 
@@ -99,7 +100,8 @@ class EmployeeController {
 
       // If no restaurantId provided, use the one from the authenticated admin
       if (!data.restaurantId) {
-        data.restaurantId = (req as any).user?.restaurantId;
+        const user = req.user;
+        data.restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
       }
 
       const result = await employeeService.createEmployee(data);

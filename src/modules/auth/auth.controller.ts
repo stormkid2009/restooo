@@ -80,7 +80,7 @@ class AuthController {
   async me(req: Request, res: Response): Promise<void> {
     try {
       // User is attached to request by auth middleware
-      const user = (req as any).user;
+      const user = req.user;
 
       res.status(200).json({
         success: true,
@@ -166,7 +166,8 @@ class AuthController {
    */
   async changePassword(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).user?.id;
+      const user = req.user;
+      const userId = user?.id;
       const data: ChangePasswordInput = req.body;
 
       if (!userId) {

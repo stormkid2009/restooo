@@ -7,7 +7,7 @@ import {
     UpdateCustomerInput,
     CustomerQueryInput,
 } from "./customer.schema";
-import { CustomerAuthRequest } from "../../middleware/authenticate";
+import { AppUser } from "../../types/auth";
 
 class CustomerController {
     /**
@@ -52,11 +52,19 @@ class CustomerController {
     async getMe(req: Request, res: Response): Promise<void> {
         try {
             // User is attached by authenticateCustomer middleware
-            const customer = (req as CustomerAuthRequest).user;
+            const user = req.user;
+
+            if (!user || user.kind !== 'customer') {
+                res.status(401).json({
+                    success: false,
+                    message: "Authentication required",
+                });
+                return;
+            }
 
             res.status(200).json({
                 success: true,
-                data: customer,
+                data: user,
             });
         } catch (error) {
             console.error("Get me error:", error);
@@ -74,10 +82,18 @@ class CustomerController {
      */
     async updateMe(req: Request, res: Response): Promise<void> {
         try {
-            const customer = (req as CustomerAuthRequest).user;
-            const data: UpdateCustomerInput = req.body;
+            const user = req.user;
 
-            const result = await customerService.updateCustomer(customer.id, data);
+            if (!user || user.kind !== 'customer') {
+                res.status(401).json({
+                    success: false,
+                    message: "Authentication required",
+                });
+                return;
+            }
+
+            const data: UpdateCustomerInput = req.body;
+            const result = await customerService.updateCustomer(user.id, data);
 
             if (!result.success) {
                 res.status(400).json({
@@ -118,7 +134,8 @@ class CustomerController {
             };
 
             // Get restaurantId from authenticated admin if scoped
-            const restaurantId = (req as any).user?.restaurantId;
+            const user = req.user;
+            const restaurantId = (user && user.kind === 'employee') ? (user.restaurantId || undefined) : undefined;
 
             const result = await customerService.getCustomers(query, restaurantId);
 
