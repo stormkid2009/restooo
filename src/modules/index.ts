@@ -3,11 +3,11 @@ import { Router } from "express";
 import authRoutes from "./auth/auth.routes";
 import menuRoutes from "./menu/menu.routes";
 import employeeRoutes from "./employee/employee.routes";
+import customerRoutes from "./customer/customer.routes";
 
 // Future route imports
 // import orderRoutes from './orderRoutes';
 // import reservationRoutes from './reservationRoutes';
-// import customerRoutes from './customerRoutes';
 // import tableRoutes from './tableRoutes';
 // import staffRoutes from './staffRoutes';
 // import analyticsRoutes from './analyticsRoutes';
@@ -78,7 +78,7 @@ router.use("/menu", menuRoutes);
 
 /**
  * Customer Management Routes
- * @prefix /api/v1/customers
+ * @prefix /api/v1/customer
  * @routes
  *   - GET / - List all customers
  *   - GET /:id - Get single customer
@@ -88,7 +88,7 @@ router.use("/menu", menuRoutes);
  *   - GET /:id/orders - Get customer order history
  * @todo Implement customer routes
  */
-// router.use('/customers', customerRoutes);
+router.use('/customer', customerRoutes);
 
 /**
  * Table Management Routes
@@ -142,7 +142,7 @@ export default router;
  * - /api/v1/menu/*        (TODO)
  * - /api/v1/orders/*      (TODO)
  * - /api/v1/reservations/* (TODO)
- * - /api/v1/customers/*   (TODO)
+ * - /api/v1/customer/*   (TODO)
  * - /api/v1/tables/*      (TODO)
  * - /api/v1/staff/*       (TODO)
  * - /api/v1/analytics/*   (TODO)
