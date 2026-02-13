@@ -3,7 +3,7 @@ import { Router } from "express";
 import authController from "./auth.controller";
 import { validateRequest } from "../../middleware/validateRequest";
 import { authenticate } from "../../middleware/authenticate";
-import { changePasswordSchema, loginSchema, registerSchema, refreshTokenSchema } from "./auth.schema";
+import { changePasswordSchema, loginSchema, registerCustomerSchema, refreshTokenSchema } from "./auth.schema";
 
 const router = Router();
 
@@ -14,8 +14,18 @@ const router = Router();
  * POST /api/v1/employee (requires ADMIN role)
  */
 
-// POST /api/v1/auth/login
-router.post("/login", validateRequest(loginSchema), authController.login);
+// POST /api/v1/auth/login/employee
+router.post("/login/employee", validateRequest(loginSchema), authController.loginEmployee);
+
+// POST /api/v1/auth/login/customer
+router.post("/login/customer", validateRequest(loginSchema), authController.loginCustomer);
+
+// POST /api/v1/auth/register/customer
+router.post(
+  "/register/customer",
+  validateRequest(registerCustomerSchema),
+  authController.registerCustomer
+);
 
 // POST /api/v1/auth/refresh
 router.post(
