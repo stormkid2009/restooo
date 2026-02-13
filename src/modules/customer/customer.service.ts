@@ -107,6 +107,46 @@ class CustomerService {
     }
 
     /**
+     * Get customer by email (Internal use for auth)
+     */
+    async getCustomerByEmail(
+        email: string,
+        includePassword = false
+    ): Promise<ServiceResponse<CustomerResponse & { password?: string }>> {
+        try {
+            const customer = await prisma.customer.findUnique({
+                where: { email, deletedAt: null },
+            });
+
+            if (!customer) {
+                return {
+                    success: false,
+                    error: "Customer not found",
+                };
+            }
+
+            if (includePassword) {
+                return {
+                    success: true,
+                    data: customer as CustomerResponse & { password?: string },
+                };
+            }
+
+            const { password, ...customerData } = customer;
+            return {
+                success: true,
+                data: customerData as CustomerResponse,
+            };
+        } catch (error) {
+            console.error("Get customer by email error:", error);
+            return {
+                success: false,
+                error: "Failed to fetch customer",
+            };
+        }
+    }
+
+    /**
      * Get customers with filtering (Admin)
      */
     async getCustomers(
