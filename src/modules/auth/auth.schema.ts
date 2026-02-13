@@ -23,7 +23,7 @@ export const loginSchema = z.object({
  * Basic info needed to create account
  * User service will handle full user creation
  */
-export const registerSchema = z.object({
+export const registerEmployeeSchema = z.object({
   email: z
     .string()
     .min(1, { error: "Email is required" })
@@ -45,6 +45,30 @@ export const registerSchema = z.object({
     })
     .optional()
     .default("STAFF"),
+});
+
+/**
+ * Register Customer Schema
+ */
+export const registerCustomerSchema = z.object({
+  email: z
+    .string()
+    .min(1, { error: "Email is required" })
+    .email({ error: "Invalid email format" }),
+
+  password: z
+    .string()
+    .min(1, { error: "Password is required" })
+    .min(6, { error: "Password must be at least 6 characters long" }),
+
+  name: z
+    .string()
+    .min(1, { error: "Name is required" })
+    .min(2, { error: "Name must be at least 2 characters long" }),
+
+  phone: z
+    .string()
+    .min(1, { error: "Phone number is required" }),
 });
 
 /**
@@ -94,7 +118,10 @@ export const refreshTokenSchema = z.object({
 
 // TypeScript Types
 export type LoginInput = z.infer<typeof loginSchema>;
-export type RegisterInput = z.infer<typeof registerSchema>;
+export type RegisterEmployeeInput = z.infer<typeof registerEmployeeSchema>;
+export type RegisterCustomerInput = z.infer<typeof registerCustomerSchema>;
+// Backward compatibility for now if needed, or just remove if we update all usages
+export type RegisterInput = RegisterEmployeeInput;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
