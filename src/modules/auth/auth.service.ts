@@ -1,9 +1,11 @@
 // src/modules/auth/auth.service.ts
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
-import { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema";
+import { ChangePasswordInput, LoginInput, RegisterEmployeeInput, RegisterCustomerInput } from "./auth.schema";
 import employeeService from "../employee/employee.service";
+import customerService from "../customer/customer.service";
 import { EmployeeResponse } from "../employee/employee.schema";
+import { CustomerResponse } from "../customer/customer.schema";
 import { comparePasswords, hashPassword } from "../../utils/encryption";
 import prisma from "../../config/database";
 
@@ -18,9 +20,10 @@ type ServiceResponse<T> =
  * Auth Response Type
  */
 interface AuthResponse {
-  user: EmployeeResponse;
+  user: EmployeeResponse | CustomerResponse;
   token: string;
   refreshToken?: string;
+  userType: 'employee' | 'customer';
 }
 
 /**
@@ -45,12 +48,9 @@ interface TokenPayload {
  */
 class AuthService {
   /**
-   * Register a new user
-   *
-   * Delegates user creation to UserService
-   * Only handles token generation after user is created
+   * Register a new employee (ADMIN ONLY usually, but keeping as service method)
    */
-  async register(data: RegisterInput): Promise<ServiceResponse<AuthResponse>> {
+  async registerEmployee(data: RegisterEmployeeInput): Promise<ServiceResponse<AuthResponse>> {
     try {
       // Delegate employee creation to EmployeeService
       const employeeResult = await employeeService.createEmployee({
@@ -67,7 +67,7 @@ class AuthService {
         };
       }
 
-      // Generate tokens for immediate login
+      // Generate tokens
       const token = this.generateAccessToken({
         userId: employeeResult.data.id,
         email: employeeResult.data.email,
@@ -88,10 +88,11 @@ class AuthService {
           user: employeeResult.data,
           token,
           refreshToken,
+          userType: 'employee',
         },
       };
     } catch (error) {
-      console.error("Registration error:", error);
+      console.error("Employee registration error:", error);
       return {
         success: false,
         error: "Registration failed. Please try again.",
@@ -100,14 +101,61 @@ class AuthService {
   }
 
   /**
-   * Login existing user
-   *
-   * Process:
-   * 1. Get user via UserService
-   * 2. Verify password
-   * 3. Generate tokens
+   * Register a new customer
    */
-  async login(data: LoginInput): Promise<ServiceResponse<AuthResponse>> {
+  async registerCustomer(data: RegisterCustomerInput): Promise<ServiceResponse<AuthResponse>> {
+    try {
+      // Delegate customer creation to CustomerService
+      const customerResult = await customerService.createCustomer(data);
+
+      if (!customerResult.success) {
+        return {
+          success: false,
+          error: customerResult.error,
+        };
+      }
+
+      // Generate tokens
+      // Customers don't have a role like employees, or we can assign 'CUSTOMER'
+      const token = this.generateAccessToken({
+        userId: customerResult.data.id,
+        email: customerResult.data.email,
+        role: 'CUSTOMER',
+        restaurantId: customerResult.data.restaurantId,
+      });
+
+      const refreshToken = this.generateRefreshToken({
+        userId: customerResult.data.id,
+        email: customerResult.data.email,
+        role: 'CUSTOMER',
+        restaurantId: customerResult.data.restaurantId,
+      });
+
+      return {
+        success: true,
+        data: {
+          user: customerResult.data,
+          token,
+          refreshToken,
+          userType: 'customer',
+        },
+      };
+    } catch (error) {
+      console.error("Customer registration error:", error);
+      return {
+        success: false,
+        error: "Registration failed. Please try again.",
+      };
+    }
+  }
+
+  // Deprecated generic register (mapped to registerEmployee for backward compatibility if needed, or just removed)
+  // For now, I'll remove it or rename checking calls. The controller uses it. I will remove it and update controller.
+
+  /**
+   * Login employee
+   */
+  async loginEmployee(data: LoginInput): Promise<ServiceResponse<AuthResponse>> {
     try {
       // Get employee with password via EmployeeService
       const employeeResult = await employeeService.getEmployeeByEmail(data.email, true);
@@ -166,10 +214,85 @@ class AuthService {
           user: employeeWithoutPassword,
           token,
           refreshToken,
+          userType: 'employee',
         },
       };
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Employee login error:", error);
+      return {
+        success: false,
+        error: "Login failed. Please try again.",
+      };
+    }
+  }
+
+  /**
+   * Login customer
+   */
+  async loginCustomer(data: LoginInput): Promise<ServiceResponse<AuthResponse>> {
+    try {
+      // Get customer with password via CustomerService
+      const customerResult = await customerService.getCustomerByEmail(data.email, true);
+
+      if (!customerResult.success) {
+        return {
+          success: false,
+          error: "Invalid credentials",
+        };
+      }
+
+      const customer = customerResult.data;
+
+      // Check if customer is active
+      if (!customer.active) {
+        return {
+          success: false,
+          error: "Account is deactivated. Please contact support.",
+        };
+      }
+
+      // Verify password
+      const isPasswordValid = await comparePasswords(
+        data.password,
+        customer.password!,
+      );
+
+      if (!isPasswordValid) {
+        return {
+          success: false,
+          error: "Invalid credentials",
+        };
+      }
+
+      // Remove password from response
+      const { password, ...customerWithoutPassword } = customer;
+
+      // Generate tokens
+      const token = this.generateAccessToken({
+        userId: customer.id,
+        email: customer.email,
+        role: 'CUSTOMER',
+        restaurantId: customer.restaurantId,
+      });
+
+      const refreshToken = this.generateRefreshToken({
+        userId: customer.id,
+        email: customer.email,
+        role: 'CUSTOMER',
+        restaurantId: customer.restaurantId,
+      });
+
+      return {
+        success: true,
+        data: {
+          user: customerWithoutPassword,
+          token,
+          refreshToken,
+          userType: 'customer',
+        },
+      };
+    } catch (error) {
+      console.error("Customer login error:", error);
       return {
         success: false,
         error: "Login failed. Please try again.",
