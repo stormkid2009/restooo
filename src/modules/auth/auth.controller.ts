@@ -1,7 +1,7 @@
 // src/modules/auth/auth.controller.ts
 import { Request, Response } from "express";
 import authService from "./auth.service";
-import { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema";
+import { ChangePasswordInput, LoginInput, RegisterEmployeeInput, RegisterCustomerInput } from "./auth.schema";
 
 /**
  * AuthController
@@ -9,14 +9,14 @@ import { ChangePasswordInput, LoginInput, RegisterInput } from "./auth.schema";
  */
 class AuthController {
   /**
-   * Register new user
-   * POST /api/v1/auth/register
+   * Register new customer
+   * POST /api/v1/auth/register/customer
    */
-  async register(req: Request, res: Response): Promise<void> {
+  async registerCustomer(req: Request, res: Response): Promise<void> {
     try {
-      const data: RegisterInput = req.body;
+      const data: RegisterCustomerInput = req.body;
 
-      const result = await authService.register(data);
+      const result = await authService.registerCustomer(data);
 
       if (!result.success) {
         res.status(400).json({
@@ -28,11 +28,11 @@ class AuthController {
 
       res.status(201).json({
         success: true,
-        message: "User registered successfully",
+        message: "Customer registered successfully",
         data: result.data,
       });
     } catch (error) {
-      console.error("Register controller error:", error);
+      console.error("Register customer controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -41,14 +41,14 @@ class AuthController {
   }
 
   /**
-   * Login user
-   * POST /api/v1/auth/login
+   * Login employee
+   * POST /api/v1/auth/login/employee
    */
-  async login(req: Request, res: Response): Promise<void> {
+  async loginEmployee(req: Request, res: Response): Promise<void> {
     try {
       const data: LoginInput = req.body;
 
-      const result = await authService.login(data);
+      const result = await authService.loginEmployee(data);
 
       if (!result.success) {
         res.status(401).json({
@@ -64,7 +64,39 @@ class AuthController {
         data: result.data,
       });
     } catch (error) {
-      console.error("Login controller error:", error);
+      console.error("Login employee controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  /**
+   * Login customer
+   * POST /api/v1/auth/login/customer
+   */
+  async loginCustomer(req: Request, res: Response): Promise<void> {
+    try {
+      const data: LoginInput = req.body;
+
+      const result = await authService.loginCustomer(data);
+
+      if (!result.success) {
+        res.status(401).json({
+          success: false,
+          message: result.error,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Login successful",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Login customer controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
