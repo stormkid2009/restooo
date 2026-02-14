@@ -1,7 +1,12 @@
 // src/modules/auth/auth.service.ts
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
-import { ChangePasswordInput, LoginInput, RegisterEmployeeInput, RegisterCustomerInput } from "./auth.schema";
+import {
+  ChangePasswordInput,
+  LoginInput,
+  RegisterEmployeeInput,
+  RegisterCustomerInput,
+} from "./auth.schema";
 import employeeService from "../employee/employee.service";
 import customerService from "../customer/customer.service";
 import { EmployeeResponse } from "../employee/employee.schema";
@@ -23,7 +28,7 @@ interface AuthResponse {
   user: EmployeeResponse | CustomerResponse;
   token: string;
   refreshToken?: string;
-  userType: 'employee' | 'customer';
+  userType: "employee" | "customer";
 }
 
 /**
@@ -41,16 +46,19 @@ interface TokenPayload {
  * AuthService Class
  *
  * Responsibilities:
- * - User authentication (login)
+ * - User authentication for both employee and customer (login)
  * - Token generation and validation
  * - Password verification
- * - Delegates user creation to UserService
+ * - Delegates employee creation to EmployeeService (internal process by admin only)
+ * - Delegates customer creation to CustomerService
  */
 class AuthService {
   /**
    * Register a new employee (ADMIN ONLY usually, but keeping as service method)
    */
-  async registerEmployee(data: RegisterEmployeeInput): Promise<ServiceResponse<AuthResponse>> {
+  async registerEmployee(
+    data: RegisterEmployeeInput,
+  ): Promise<ServiceResponse<AuthResponse>> {
     try {
       // Delegate employee creation to EmployeeService
       const employeeResult = await employeeService.createEmployee({
@@ -88,7 +96,7 @@ class AuthService {
           user: employeeResult.data,
           token,
           refreshToken,
-          userType: 'employee',
+          userType: "employee",
         },
       };
     } catch (error) {
@@ -103,7 +111,9 @@ class AuthService {
   /**
    * Register a new customer
    */
-  async registerCustomer(data: RegisterCustomerInput): Promise<ServiceResponse<AuthResponse>> {
+  async registerCustomer(
+    data: RegisterCustomerInput,
+  ): Promise<ServiceResponse<AuthResponse>> {
     try {
       // Delegate customer creation to CustomerService
       const customerResult = await customerService.createCustomer(data);
@@ -120,14 +130,14 @@ class AuthService {
       const token = this.generateAccessToken({
         userId: customerResult.data.id,
         email: customerResult.data.email,
-        role: 'CUSTOMER',
+        role: "CUSTOMER",
         restaurantId: customerResult.data.restaurantId,
       });
 
       const refreshToken = this.generateRefreshToken({
         userId: customerResult.data.id,
         email: customerResult.data.email,
-        role: 'CUSTOMER',
+        role: "CUSTOMER",
         restaurantId: customerResult.data.restaurantId,
       });
 
@@ -137,7 +147,7 @@ class AuthService {
           user: customerResult.data,
           token,
           refreshToken,
-          userType: 'customer',
+          userType: "customer",
         },
       };
     } catch (error) {
@@ -149,16 +159,18 @@ class AuthService {
     }
   }
 
-  // Deprecated generic register (mapped to registerEmployee for backward compatibility if needed, or just removed)
-  // For now, I'll remove it or rename checking calls. The controller uses it. I will remove it and update controller.
-
   /**
    * Login employee
    */
-  async loginEmployee(data: LoginInput): Promise<ServiceResponse<AuthResponse>> {
+  async loginEmployee(
+    data: LoginInput,
+  ): Promise<ServiceResponse<AuthResponse>> {
     try {
       // Get employee with password via EmployeeService
-      const employeeResult = await employeeService.getEmployeeByEmail(data.email, true);
+      const employeeResult = await employeeService.getEmployeeByEmail(
+        data.email,
+        true,
+      );
 
       if (!employeeResult.success) {
         return {
@@ -214,7 +226,7 @@ class AuthService {
           user: employeeWithoutPassword,
           token,
           refreshToken,
-          userType: 'employee',
+          userType: "employee",
         },
       };
     } catch (error) {
@@ -229,10 +241,15 @@ class AuthService {
   /**
    * Login customer
    */
-  async loginCustomer(data: LoginInput): Promise<ServiceResponse<AuthResponse>> {
+  async loginCustomer(
+    data: LoginInput,
+  ): Promise<ServiceResponse<AuthResponse>> {
     try {
       // Get customer with password via CustomerService
-      const customerResult = await customerService.getCustomerByEmail(data.email, true);
+      const customerResult = await customerService.getCustomerByEmail(
+        data.email,
+        true,
+      );
 
       if (!customerResult.success) {
         return {
@@ -271,14 +288,14 @@ class AuthService {
       const token = this.generateAccessToken({
         userId: customer.id,
         email: customer.email,
-        role: 'CUSTOMER',
+        role: "CUSTOMER",
         restaurantId: customer.restaurantId,
       });
 
       const refreshToken = this.generateRefreshToken({
         userId: customer.id,
         email: customer.email,
-        role: 'CUSTOMER',
+        role: "CUSTOMER",
         restaurantId: customer.restaurantId,
       });
 
@@ -288,7 +305,7 @@ class AuthService {
           user: customerWithoutPassword,
           token,
           refreshToken,
-          userType: 'customer',
+          userType: "customer",
         },
       };
     } catch (error) {
@@ -406,11 +423,14 @@ class AuthService {
    */
   async changePassword(
     userId: string,
-    data: ChangePasswordInput
+    data: ChangePasswordInput,
   ): Promise<ServiceResponse<{ message: string }>> {
     try {
       // Get employee with password
-      const employeeResult = await employeeService.getEmployeeById(userId, true);
+      const employeeResult = await employeeService.getEmployeeById(
+        userId,
+        true,
+      );
 
       if (!employeeResult.success) {
         return {
@@ -424,7 +444,7 @@ class AuthService {
       // Verify current password
       const isCurrentPasswordValid = await comparePasswords(
         data.currentPassword,
-        employee.password!
+        employee.password!,
       );
 
       if (!isCurrentPasswordValid) {
