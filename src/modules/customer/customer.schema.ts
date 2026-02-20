@@ -24,7 +24,8 @@ export const createCustomerSchema = z.object({
 
   phone: z
     .string()
-    .min(1, { error: "Phone number is required" }),
+    .min(1, { error: "Phone number is required" })
+    .regex(/^01[0125]\d{8}$/, { error: "Phone must be a valid Egyptian mobile number (e.g. 01012345678)" }),
 
   restaurantId: z.string().uuid({ error: "Invalid restaurant ID format" }).optional(),
 });
@@ -44,7 +45,10 @@ export const updateCustomerSchema = z.object({
     .min(2, { error: "Name must be at least 2 characters long" })
     .optional(),
 
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .regex(/^01[0125]\d{8}$/, { error: "Phone must be a valid Egyptian mobile number (e.g. 01012345678)" })
+    .optional(),
 });
 
 /**
