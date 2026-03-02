@@ -2,7 +2,7 @@
 import { Router } from "express";
 import authController from "./auth.controller";
 import { validateRequest } from "../../middleware/validateRequest";
-import { authenticate } from "../../middleware/authenticate";
+import { authenticate, authenticateAny } from "../../middleware/authenticate";
 import { changePasswordSchema, loginSchema, registerCustomerSchema, refreshTokenSchema } from "./auth.schema";
 
 const router = Router();
@@ -48,7 +48,7 @@ router.post("/logout", authenticate, authController.logout);
 // PATCH /api/v1/auth/change-password - Change password (authenticated)
 router.patch(
   "/change-password",
-  authenticate,
+  authenticateAny,
   validateRequest(changePasswordSchema),
   authController.changePassword,
 );

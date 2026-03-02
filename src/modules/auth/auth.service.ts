@@ -423,28 +423,31 @@ class AuthService {
    */
   async changePassword(
     userId: string,
+    userKind: "employee" | "customer",
     data: ChangePasswordInput,
   ): Promise<ServiceResponse<{ message: string }>> {
     try {
-      // Get employee with password
-      const employeeResult = await employeeService.getEmployeeById(
-        userId,
-        true,
-      );
+      // Get user with password
+      let userWithPassword;
 
-      if (!employeeResult.success) {
-        return {
-          success: false,
-          error: "User not found",
-        };
+      if (userKind === "employee") {
+        const employeeResult = await employeeService.getEmployeeById(userId, true);
+        if (!employeeResult.success) {
+          return { success: false, error: "User not found" };
+        }
+        userWithPassword = employeeResult.data;
+      } else {
+        const customerResult = await customerService.getCustomerById(userId, true);
+        if (!customerResult.success) {
+          return { success: false, error: "User not found" };
+        }
+        userWithPassword = customerResult.data;
       }
-
-      const employee = employeeResult.data;
 
       // Verify current password
       const isCurrentPasswordValid = await comparePasswords(
         data.currentPassword,
-        employee.password!,
+        userWithPassword.password!,
       );
 
       if (!isCurrentPasswordValid) {
@@ -458,10 +461,17 @@ class AuthService {
       const hashedPassword = await hashPassword(data.newPassword);
 
       // Update password in database
-      await prisma.employee.update({
-        where: { id: userId },
-        data: { password: hashedPassword },
-      });
+      if (userKind === "employee") {
+        await prisma.employee.update({
+          where: { id: userId },
+          data: { password: hashedPassword },
+        });
+      } else {
+        await prisma.customer.update({
+          where: { id: userId },
+          data: { password: hashedPassword },
+        });
+      }
 
       return {
         success: true,

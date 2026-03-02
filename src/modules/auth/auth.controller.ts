@@ -200,9 +200,10 @@ class AuthController {
     try {
       const user = req.user;
       const userId = user?.id;
+      const userKind = user?.kind;
       const data: ChangePasswordInput = req.body;
 
-      if (!userId) {
+      if (!userId || !userKind) {
         res.status(401).json({
           success: false,
           message: "Authentication required",
@@ -210,7 +211,7 @@ class AuthController {
         return;
       }
 
-      const result = await authService.changePassword(userId, data);
+      const result = await authService.changePassword(userId, userKind, data);
 
       if (!result.success) {
         res.status(400).json({

@@ -78,7 +78,10 @@ class CustomerService {
     /**
      * Get customer by ID
      */
-    async getCustomerById(id: string): Promise<ServiceResponse<CustomerResponse>> {
+    async getCustomerById(
+        id: string,
+        includePassword = false
+    ): Promise<ServiceResponse<CustomerResponse & { password?: string }>> {
         try {
             const customer = await prisma.customer.findUnique({
                 where: { id, deletedAt: null },
@@ -88,6 +91,13 @@ class CustomerService {
                 return {
                     success: false,
                     error: "Customer not found",
+                };
+            }
+
+            if (includePassword) {
+                return {
+                    success: true,
+                    data: customer as CustomerResponse & { password?: string },
                 };
             }
 

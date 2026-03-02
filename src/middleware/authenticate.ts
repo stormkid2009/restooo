@@ -158,6 +158,95 @@ export const authenticate = createAuthMiddleware({ type: "employee" });
 export const authenticateCustomer = createAuthMiddleware({ type: "customer" });
 
 /**
+ * Authenticate Middleware (Any)
+ *
+ * Verifies JWT token and attempts to authenticate as either employee or customer.
+ * This does not use createAuthMiddleware directly because it needs to check both.
+ */
+export const authenticateAny = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({
+        success: false,
+        message: "Access token is required",
+      });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET is not defined");
+    }
+
+    let decoded: JWTPayload;
+    try {
+      decoded = jwt.verify(token, secret) as JWTPayload;
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        res.status(401).json({
+          success: false,
+          message: "Token expired",
+        });
+        return;
+      }
+      if (error instanceof jwt.JsonWebTokenError) {
+        res.status(401).json({
+          success: false,
+          message: "Invalid token",
+        });
+        return;
+      }
+      throw error;
+    }
+
+    // Try employee first
+    let userResult: any = await employeeService.getEmployeeById(decoded.userId);
+    let kind: "employee" | "customer" = "employee";
+
+    // If not found, try customer
+    if (!userResult.success) {
+      userResult = await customerService.getCustomerById(decoded.userId);
+      kind = "customer";
+    }
+
+    if (!userResult.success) {
+      res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
+
+    const user = userResult.data;
+
+    if (!user.active) {
+      res.status(403).json({
+        success: false,
+        message: "Account is deactivated",
+      });
+      return;
+    }
+
+    // Attach user to request
+    req.user = { ...(user as any), kind };
+    next();
+  } catch (error) {
+    console.error("Authentication error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Authentication failed",
+    });
+  }
+};
+
+/**
  * Authorize Middleware
  *
  * Checks if authenticated user has required role(s)
