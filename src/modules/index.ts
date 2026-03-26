@@ -7,8 +7,9 @@ import customerRoutes from "./customer/customer.routes";
 
 // Future route imports
 // import orderRoutes from './orderRoutes';
+// import orderRoutes from './orderRoutes';
 // import reservationRoutes from './reservationRoutes';
-// import tableRoutes from './tableRoutes';
+import tableRoutes from './table/table.routes';
 // import staffRoutes from './staffRoutes';
 // import analyticsRoutes from './analyticsRoutes';
 
@@ -92,7 +93,7 @@ router.use('/customer', customerRoutes);
 
 /**
  * Table Management Routes
- * @prefix /api/v1/tables
+ * @prefix /api/v1/table
  * @routes
  *   - GET / - List all tables
  *   - GET /:id - Get single table
@@ -100,9 +101,8 @@ router.use('/customer', customerRoutes);
  *   - PUT /:id - Update table
  *   - PATCH /:id/status - Update table status
  *   - DELETE /:id - Delete table
- * @todo Implement table routes
  */
-// router.use('/tables', tableRoutes);
+router.use('/table', tableRoutes);
 
 /**
  * Staff Management Routes
@@ -143,7 +143,7 @@ export default router;
  * - /api/v1/orders/*      (TODO)
  * - /api/v1/reservations/* (TODO)
  * - /api/v1/customer/*   (TODO)
- * - /api/v1/tables/*      (TODO)
+ * - /api/v1/table/*
  * - /api/v1/staff/*       (TODO)
  * - /api/v1/analytics/*   (TODO)
  */
