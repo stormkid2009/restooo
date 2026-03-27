@@ -6,8 +6,7 @@ import employeeRoutes from "./employee/employee.routes";
 import customerRoutes from "./customer/customer.routes";
 
 // Future route imports
-// import orderRoutes from './orderRoutes';
-// import orderRoutes from './orderRoutes';
+import orderRoutes from './order/order.routes';
 // import reservationRoutes from './reservationRoutes';
 import tableRoutes from './table/table.routes';
 // import staffRoutes from './staffRoutes';
@@ -61,7 +60,7 @@ router.use("/menu", menuRoutes);
  *   - DELETE /:id - Cancel order
  * @todo Implement order routes
  */
-// router.use('/orders', orderRoutes);
+router.use('/order', orderRoutes);
 
 /**
  * Reservation Management Routes
