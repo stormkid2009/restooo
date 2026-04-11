@@ -73,7 +73,7 @@ enum PaymentMethod {
   CASH
   CARD
   ONLINE
-  MOBILE_WALLET  // e.g., Fawry in Egypt
+  MOBILE_WALLET // e.g., Fawry in Egypt
 }
 
 // Payment statuses
@@ -102,7 +102,7 @@ model Restaurant {
   name      String
   address   String?
   phone     String?
-  email     String    @unique  // ✅ Required for contact
+  email     String    @unique // ✅ Required for contact
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // ✅ Soft delete using deletedAt pattern
@@ -119,8 +119,8 @@ model Restaurant {
   inventory    Inventory[]
   deliveries   Delivery[]
 
-  @@map("restaurants")
   @@index([deletedAt]) // For filtering active restaurants
+  @@map("restaurants")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -130,7 +130,7 @@ model Restaurant {
 model Employee {
   id        String    @id @default(uuid())
   email     String    @unique
-  password  String    // ✅ Required - all employees must be able to login
+  password  String // ✅ Required - all employees must be able to login
   name      String
   phone     String?
   role      Role      @default(STAFF)
@@ -146,10 +146,10 @@ model Employee {
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
   orders       Order[]
 
-  @@map("employees")
   @@index([restaurantId, role])
   @@index([restaurantId, deletedAt])
   @@index([email])
+  @@map("employees")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -159,11 +159,11 @@ model Employee {
 model Customer {
   id            String    @id @default(uuid())
   email         String    @unique // ✅ Required for registration & login
-  password      String    // ✅ Required for authentication
+  password      String // ✅ Required for authentication
   name          String
   phone         String    @unique // ✅ Required & unique (important for delivery)
   loyaltyPoints Int       @default(0)
-  addresses     Json?     // Array of address objects: [{"type": "home", "address": "...", "city": "..."}]
+  addresses     Json? // Array of address objects: [{"type": "home", "address": "...", "city": "..."}]
   active        Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -175,10 +175,10 @@ model Customer {
   orders       Order[]
   reservations Reservation[]
 
-  @@map("customers")
   @@index([restaurantId, email])
   @@index([restaurantId, phone])
   @@index([restaurantId, deletedAt])
+  @@map("customers")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -193,7 +193,7 @@ model MenuItem {
   price           Decimal   @db.Decimal(10, 2)
   available       Boolean   @default(true)
   imageUrl        String?
-  allergens       String[]  // Array: ["dairy", "gluten", "nuts"]
+  allergens       String[] // Array: ["dairy", "gluten", "nuts"]
   prepTimeMinutes Int       @default(15)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -205,10 +205,10 @@ model MenuItem {
   orderItems   OrderItem[]
   recipeItems  RecipeItem[] // For inventory management
 
-  @@map("menu_items")
   @@index([restaurantId, category])
   @@index([restaurantId, available])
   @@index([restaurantId, deletedAt])
+  @@map("menu_items")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -217,13 +217,13 @@ model MenuItem {
 
 model Table {
   id        String      @id @default(uuid())
-  number    Int         // ✅ Not globally unique - unique per restaurant
+  number    Int // ✅ Not globally unique - unique per restaurant
   capacity  Int
   status    TableStatus @default(AVAILABLE)
-  location  String?     // e.g., "Main Floor", "Patio", "Private Room"
+  location  String? // e.g., "Main Floor", "Patio", "Private Room"
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-  deletedAt DateTime?   // ✅ Soft delete
+  deletedAt DateTime? // ✅ Soft delete
 
   // Relations
   restaurantId String
@@ -232,9 +232,9 @@ model Table {
   reservations Reservation[]
 
   @@unique([restaurantId, number]) // ✅ FIXED: Table number unique per restaurant
-  @@map("tables")
   @@index([restaurantId, status])
   @@index([restaurantId, deletedAt])
+  @@map("tables")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -242,55 +242,56 @@ model Table {
 // ════════════════════════════════════════════════════════════════
 
 model Order {
-  id              String      @id @default(uuid())
-  orderNumber     String      @unique
-  tableId         String?
-  customerId      String?
-  employeeId      String?
-  status          OrderStatus @default(PENDING)
-  orderType       OrderType   @default(DINE_IN)
-  
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  tableId     String?
+  customerId  String?
+  employeeId  String?
+  status      OrderStatus @default(PENDING)
+  orderType   OrderType   @default(DINE_IN)
+
   // Pricing
-  subtotal        Decimal     @db.Decimal(10, 2)
-  tax             Decimal     @db.Decimal(10, 2)
-  tip             Decimal     @db.Decimal(10, 2) @default(0)
-  total           Decimal     @db.Decimal(10, 2)
-  
+  subtotal Decimal @db.Decimal(10, 2)
+  tax      Decimal @db.Decimal(10, 2)
+  tip      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+
   // Delivery specific
   deliveryAddress String?
-  deliveryFee     Decimal?    @db.Decimal(10, 2)
-  
+  deliveryFee     Decimal? @db.Decimal(10, 2)
+
   // Timeline tracking (for analytics & customer updates)
-  estimatedTime   DateTime?
-  placedAt        DateTime?   // When customer placed order
-  acceptedAt      DateTime?   // When restaurant accepted
-  preparedAt      DateTime?   // When kitchen finished
-  servedAt        DateTime?   // When served to customer (dine-in)
-  deliveredAt     DateTime?   // When delivered (delivery orders)
-  
+  estimatedTime DateTime?
+  placedAt      DateTime? // When customer placed order
+  acceptedAt    DateTime? // When restaurant accepted
+  preparedAt    DateTime? // When kitchen finished
+  servedAt      DateTime? // When served to customer (dine-in)
+  deliveredAt   DateTime? // When delivered (delivery orders)
+
   // Metadata
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  completedAt     DateTime?
-  deletedAt       DateTime?   // ✅ Soft delete
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+  cancelledAt DateTime?
+  deletedAt   DateTime? // ✅ Soft delete
 
   // Relations
-  table        Table?      @relation(fields: [tableId], references: [id])
-  customer     Customer?   @relation(fields: [customerId], references: [id])
-  employee     Employee?   @relation(fields: [employeeId], references: [id])
-  items        OrderItem[]
-  payments     Payment[]
-  delivery     Delivery?
-  
+  table    Table?      @relation(fields: [tableId], references: [id])
+  customer Customer?   @relation(fields: [customerId], references: [id])
+  employee Employee?   @relation(fields: [employeeId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+  delivery Delivery?
+
   restaurantId String
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantId, orderNumber]) // Ensures unique order numbers per restaurant
-  @@map("orders")
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt(sort: Desc)])
   @@index([customerId, createdAt(sort: Desc)])
   @@index([restaurantId, deletedAt])
+  @@map("orders")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -310,9 +311,9 @@ model OrderItem {
   order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   menuItem MenuItem @relation(fields: [menuItemId], references: [id])
 
-  @@map("order_items")
   @@index([orderId])
   @@index([menuItemId])
+  @@map("order_items")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -323,14 +324,14 @@ model Reservation {
   id              String            @id @default(uuid())
   customerId      String
   tableId         String?
-  date            DateTime          // Reservation date
-  time            String            // Reservation time (e.g., "19:30")
-  partySize       Int               // Number of guests
+  date            DateTime // Reservation date
+  time            String // Reservation time (e.g., "19:30")
+  partySize       Int // Number of guests
   status          ReservationStatus @default(PENDING)
   specialRequests String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  deletedAt       DateTime?         // ✅ Soft delete
+  deletedAt       DateTime? // ✅ Soft delete
 
   // Relations
   customer     Customer   @relation(fields: [customerId], references: [id])
@@ -338,10 +339,10 @@ model Reservation {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@map("reservations")
   @@index([restaurantId, date])
   @@index([customerId, date])
   @@index([restaurantId, deletedAt])
+  @@map("reservations")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -350,25 +351,25 @@ model Reservation {
 
 model Payment {
   id            String        @id @default(uuid())
-  orderId       String        // Multiple payments per order allowed (split bills)
+  orderId       String // Multiple payments per order allowed (split bills)
   amount        Decimal       @db.Decimal(10, 2)
   method        PaymentMethod
   status        PaymentStatus @default(PENDING)
-  transactionId String?       // External payment gateway transaction ID
+  transactionId String? // External payment gateway transaction ID
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?     // ✅ Soft delete
+  deletedAt     DateTime? // ✅ Soft delete
 
   // Relations
   order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@map("payments")
   @@index([orderId])
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt(sort: Desc)])
   @@index([restaurantId, deletedAt])
+  @@map("payments")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -378,7 +379,7 @@ model Payment {
 model Ingredient {
   id          String    @id @default(uuid())
   name        String
-  unit        String    // e.g., "kg", "liter", "piece"
+  unit        String // e.g., "kg", "liter", "piece"
   costPerUnit Decimal   @db.Decimal(10, 2)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -390,15 +391,15 @@ model Ingredient {
   inventory    Inventory?
   recipeItems  RecipeItem[]
 
-  @@map("ingredients")
   @@index([restaurantId, name])
   @@index([restaurantId, deletedAt])
+  @@map("ingredients")
 }
 
 model Inventory {
   id                String    @id @default(uuid())
   ingredientId      String    @unique
-  stockLevel        Float     // Current stock (e.g., 10.5 kg)
+  stockLevel        Float // Current stock (e.g., 10.5 kg)
   lowStockThreshold Float     @default(5) // Alert when below this
   lastUpdated       DateTime  @updatedAt
   deletedAt         DateTime? // ✅ Soft delete
@@ -408,25 +409,25 @@ model Inventory {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@map("inventory")
   @@index([restaurantId, stockLevel]) // For low stock alerts
   @@index([restaurantId, deletedAt])
+  @@map("inventory")
 }
 
 model RecipeItem {
   id           String @id @default(uuid())
   menuItemId   String
   ingredientId String
-  quantity     Float  // Amount needed per serving (e.g., 0.2 kg)
+  quantity     Float // Amount needed per serving (e.g., 0.2 kg)
 
   // Relations
   menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 
   @@unique([menuItemId, ingredientId]) // One ingredient per menu item
-  @@map("recipe_items")
   @@index([menuItemId])
   @@index([ingredientId])
+  @@map("recipe_items")
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -436,21 +437,21 @@ model RecipeItem {
 model Delivery {
   id          String         @id @default(uuid())
   orderId     String         @unique // One delivery per order
-  driverId    String?        // Future: Link to Driver model
+  driverId    String? // Future: Link to Driver model
   status      DeliveryStatus @default(PENDING)
-  trackingUrl String?        // e.g., Google Maps link
+  trackingUrl String? // e.g., Google Maps link
   notes       String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
-  deletedAt   DateTime?      // ✅ Soft delete
+  deletedAt   DateTime? // ✅ Soft delete
 
   // Relations
   order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@map("deliveries")
   @@index([orderId])
   @@index([restaurantId, status])
   @@index([restaurantId, deletedAt])
+  @@map("deliveries")
 }
