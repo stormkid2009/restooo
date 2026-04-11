@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import routes from "./modules/index";
+import { errorHandler } from "./middleware/errorHandler";
 
 const app: Application = express();
 
@@ -51,5 +52,8 @@ app.use((req: Request, res: Response) => {
     message: "Route not found",
   });
 });
+
+// Global Error Handler
+app.use(errorHandler);
 
 export default app;
