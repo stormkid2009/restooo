@@ -1,90 +1,202 @@
+import crypto from "crypto";
 import { Prisma } from "@prisma/client";
+import { NotFoundError, BadRequestError } from "../../utils/errors";
 import prisma from "../../config/database";
-import { CreateOrderInput, UpdateOrderInput, UpdateOrderStatusInput, ListOrderQuery } from "./order.schema";
+import {
+  CreateOrderInput,
+  UpdateOrderStatusInput,
+  ListOrderQuery,
+} from "./order.schema";
 
 export class OrderService {
   /**
    * Create a new order
+   *
+   * @param restaurantId - The ID of the restaurant
+   * @param data - The order creation data.
+   *   Note: The `tax` field is treated as a tax rate multiplier
+   *   (e.g., 0.14 = 14%) and must be between 0 and 1.
    */
   async createOrder(restaurantId: string, data: CreateOrderInput) {
-    const { items, tableId, customerId, orderType, tax, tip, deliveryAddress, deliveryFee } = data;
+    const {
+      items,
+      tableId,
+      customerId,
+      orderType,
+      tax,
+      tip,
+      deliveryAddress,
+      deliveryFee,
+    } = data;
+    // These are quick business validations
+    if (!items || items.length === 0) {
+      throw new BadRequestError("Order must contain at least one item.");
+    }
 
+    if (orderType === "DINE_IN" && !tableId) {
+      throw new BadRequestError("Table ID is required for dine-in orders.");
+    }
+
+    if (orderType === "DELIVERY" && !deliveryAddress) {
+      throw new BadRequestError(
+        "Delivery address is required for delivery orders.",
+      );
+    }
+
+    if (tax < 0 || tax > 1) {
+      throw new BadRequestError("Tax rate must be between 0 and 1.");
+    }
+    // Optional: quantity check
+    for (const item of items) {
+      if (item.quantity < 1) {
+        throw new BadRequestError(
+          `Quantity must be at least 1 for menu item ${item.menuItemId}`,
+        );
+      }
+    }
     // Fetch current prices for all menu items in the order
     const menuItemIds = items.map((item) => item.menuItemId);
+    const uniqueMenuItemIds = [...new Set(menuItemIds)];
     const menuItems = await prisma.menuItem.findMany({
-        where: { id: { in: menuItemIds }, restaurantId, deletedAt: null }
+      where: { id: { in: uniqueMenuItemIds }, restaurantId, deletedAt: null },
     });
 
-    if (menuItems.length !== menuItemIds.length) {
-        throw new Error("One or more menu items were not found or not available.");
+    if (menuItems.length !== uniqueMenuItemIds.length) {
+      throw new BadRequestError(
+        "One or more menu items were not found or not available.",
+      );
     }
 
     // Create a lookup for current prices
     const itemPrices: Record<string, number> = {};
     menuItems.forEach((mi) => {
-        itemPrices[mi.id] = Number(mi.price);
+      itemPrices[mi.id] = Number(mi.price);
     });
 
     // Calculate subtotal
     let subtotal = 0;
-    const orderItemsRecord: { menuItemId: string, quantity: number, price: number, specialInstructions: string | null }[] = [];
+    const orderItemsRecord: {
+      menuItemId: string;
+      quantity: number;
+      price: number;
+      specialInstructions: string | null;
+    }[] = [];
 
     items.forEach((item) => {
-        const itemPrice = itemPrices[item.menuItemId];
-        subtotal += itemPrice * item.quantity;
-        orderItemsRecord.push({
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            price: itemPrice, // Snapshot price at time of order
-            specialInstructions: item.specialInstructions || null
-        });
+      const itemPrice = itemPrices[item.menuItemId];
+      subtotal += itemPrice * item.quantity;
+      orderItemsRecord.push({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        price: itemPrice, // Snapshot price at time of order
+        specialInstructions: item.specialInstructions || null,
+      });
     });
 
     // Calculate total: subtotal + tax + tip + delivery fee
     // Note: If tax is provided as a percentage (e.g., 0.14), we calculate it against subtotal. If it's a fixed amount, it needs adjustment. Let's assume tax here is a FIXED rate multiplier.
+    if (tax > 1) {
+      throw new BadRequestError("Tax cannot be greater than 1.");
+    }
     const taxAmount = subtotal * tax;
-    const computedTotal = subtotal + taxAmount + tip + deliveryFee;
+    const safeTip = tip ?? 0;
+    const safeDeliveryFee = deliveryFee ?? 0;
+    const computedTotal = subtotal + taxAmount + safeTip + safeDeliveryFee;
 
-    // Generate unique order number logic
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
+    // Generate up to 3 candidate order numbers upfront
+    const maxAttempts = 10; // changes from 3 to 10
+    const orderNumberCandidates = Array.from({ length: maxAttempts }, () => {
+      const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+      const randomPart = crypto.randomBytes(4).toString("hex").toUpperCase(); // randomBytes changes from 3 to 4
+      return `ORD-${datePart}-${randomPart}`;
+    });
 
-    // Create Order with its Items in a Transaction
-    const order = await prisma.$transaction(async (tx) => {
-        const newOrder = await tx.order.create({
-            data: {
+    let order;
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      try {
+        const orderNumber = orderNumberCandidates[attempts];
+
+        // Create Order with its Items in a Transaction
+        order = await prisma.$transaction(async (tx) => {
+          if (customerId) {
+            const customer = await tx.customer.findFirst({
+              where: { id: customerId, restaurantId, deletedAt: null },
+            });
+            if (!customer) {
+              throw new NotFoundError("Customer not found.");
+            }
+          }
+
+          // Optimistically lock the table first (prevents race conditions)
+          if (tableId && orderType === "DINE_IN") {
+            const tableUpdate = await tx.table.updateMany({
+              where: {
+                id: tableId,
                 restaurantId,
-                orderNumber,
-                tableId,
-                customerId,
-                orderType,
-                subtotal: subtotal,
-                tax: taxAmount, 
-                tip: tip,
-                deliveryFee: deliveryFee,
-                total: computedTotal,
-                deliveryAddress: deliveryAddress,
-                status: "PENDING",
-                items: {
-                    create: orderItemsRecord
-                }
+                status: "AVAILABLE",
+                deletedAt: null,
+              },
+              data: { status: "OCCUPIED" },
+            });
+
+            if (tableUpdate.count === 0) {
+              // If count is 0, the table doesn't exist, is deleted, or is already occupied.
+              // Throwing an error here rolls back the transaction instantly.
+              throw new BadRequestError(
+                "Table is not available, does not exist, or is already occupied.",
+              );
+            }
+          }
+
+          return await tx.order.create({
+            data: {
+              restaurantId,
+              orderNumber,
+              tableId,
+              customerId,
+              orderType,
+              subtotal: subtotal,
+              tax: taxAmount,
+              tip: safeTip,
+              deliveryFee: safeDeliveryFee,
+              total: computedTotal,
+              deliveryAddress: deliveryAddress,
+              status: "PENDING",
+              items: {
+                create: orderItemsRecord,
+              },
             },
             include: {
-                items: true,
-                table: true,
-                customer: true
-            }
+              items: true,
+              table: true,
+              customer: true,
+            },
+          });
         });
 
-        // Optionally, if DINE_IN and table exists, we may want to update the table status to OCCUPIED
-        if (tableId && orderType === "DINE_IN") {
-            await tx.table.update({
-                where: { id: tableId },
-                data: { status: "OCCUPIED" }
-            });
+        break;
+      } catch (error: any) {
+        if (
+          error.code === "P2002" &&
+          error.meta?.target?.includes("orderNumber")
+        ) {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw new BadRequestError(
+              "Failed to generate a unique order number. Please try again.",
+            );
+          }
+        } else {
+          throw error;
         }
+      }
+    }
 
-        return newOrder;
-    });
+    if (!order) {
+      throw new BadRequestError("Failed to create order.");
+    }
 
     return order;
   }
@@ -92,7 +204,27 @@ export class OrderService {
   /**
    * Get paginated and filtered orders
    */
-  async getOrders(restaurantId: string, query: ListOrderQuery, page = 1, limit = 10) {
+  async getOrders(
+    restaurantId: string,
+    query: ListOrderQuery,
+    page = 1,
+    limit = 10,
+  ) {
+    if (query.status) {
+      const validStatuses = [
+        "PENDING",
+        "PREPARING",
+        "READY",
+        "SERVED",
+        "DELIVERED",
+        "COMPLETED",
+        "CANCELLED",
+      ];
+      if (!validStatuses.includes(query.status)) {
+        throw new BadRequestError("Invalid status filter.");
+      }
+    }
+
     const skip = (page - 1) * limit;
 
     const where: Prisma.OrderWhereInput = {
@@ -111,10 +243,11 @@ export class OrderService {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
+          items: true,
           table: true,
           customer: true,
-          employee: true
-        }
+          employee: true,
+        },
       }),
       prisma.order.count({ where }),
     ]);
@@ -138,18 +271,18 @@ export class OrderService {
       where: { id: orderId, restaurantId, deletedAt: null },
       include: {
         items: {
-            include: {
-                menuItem: true
-            }
+          include: {
+            menuItem: true,
+          },
         },
         table: true,
         customer: true,
-        employee: true
+        employee: true,
       },
     });
 
     if (!order) {
-      throw new Error("Order not found");
+      throw new NotFoundError("Order not found");
     }
 
     return order;
@@ -158,7 +291,27 @@ export class OrderService {
   /**
    * Update order status
    */
-  async updateOrderStatus(restaurantId: string, orderId: string, data: UpdateOrderStatusInput) {
+  async updateOrderStatus(
+    restaurantId: string,
+    orderId: string,
+    data: UpdateOrderStatusInput,
+  ) {
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      PENDING: ["PREPARING", "CANCELLED"],
+      PREPARING: ["READY", "CANCELLED"],
+      READY: ["SERVED", "DELIVERED"],
+      SERVED: ["COMPLETED"],
+      DELIVERED: ["COMPLETED"],
+    };
+
+    const validPreviousStatuses = Object.entries(VALID_TRANSITIONS)
+      .filter(([_, targets]) => targets.includes(data.status as string))
+      .map(([prev]) => prev as any);
+
+    if (validPreviousStatuses.length === 0) {
+      throw new BadRequestError(`Invalid target status: ${data.status}`);
+    }
+
     // Determine which timestamp to update based on the status change
     const updateData: Prisma.OrderUpdateInput = { status: data.status };
     const now = new Date();
@@ -166,34 +319,70 @@ export class OrderService {
     if (data.status === "PREPARING") updateData.acceptedAt = now;
     if (data.status === "READY") updateData.preparedAt = now;
     if (data.status === "SERVED") updateData.servedAt = now;
-    if (data.status === "OUT_FOR_DELIVERY") updateData.preparedAt = now;
     if (data.status === "DELIVERED") updateData.deliveredAt = now;
     if (data.status === "COMPLETED") updateData.completedAt = now;
+    if (data.status === "CANCELLED") updateData.cancelledAt = now;
 
-    const orderExists = await prisma.order.findFirst({
-      where: { id: orderId, restaurantId }
-    });
+    try {
+      const order = await prisma.$transaction(async (tx) => {
+        const updatedOrder = await tx.order.update({
+          where: {
+            id: orderId,
+            restaurantId,
+            status: { in: validPreviousStatuses },
+            deletedAt: null, // Exclude soft-deleted orders
+          },
+          data: updateData,
+        });
 
-    if (!orderExists) {
-        throw new Error("Order not found");
+        // Free the table if the order is cancelled
+        if (data.status === "CANCELLED" && updatedOrder.tableId) {
+          await tx.table.updateMany({
+            where: { id: updatedOrder.tableId },
+            data: { status: "AVAILABLE" },
+          });
+        }
+
+        return updatedOrder;
+      });
+      return order;
+    } catch (error: any) {
+      if (error.code === "P2025") {
+        const currentOrder = await prisma.order.findUnique({
+          where: { id: orderId },
+        });
+
+        if (
+          !currentOrder ||
+          currentOrder.restaurantId !== restaurantId ||
+          currentOrder.deletedAt
+        ) {
+          throw new NotFoundError("Order not found");
+        }
+
+        throw new BadRequestError(
+          `Invalid status transition from ${currentOrder.status} to ${data.status}`,
+        );
+      }
+      throw error;
     }
-
-    const order = await prisma.order.update({
-      where: { id: orderId },
-      data: updateData
-    });
-
-    return order;
   }
 
   /**
    * Soft delete order
    */
   async deleteOrder(restaurantId: string, orderId: string) {
-    return prisma.order.updateMany({
-      where: { id: orderId, restaurantId },
-      data: { deletedAt: new Date() },
-    });
+    try {
+      return await prisma.order.update({
+        where: { id: orderId, restaurantId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+    } catch (error: any) {
+      if (error.code === "P2025") {
+        throw new NotFoundError("Order not found");
+      }
+      throw error;
+    }
   }
 }
 
