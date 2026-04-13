@@ -409,17 +409,58 @@ export class OrderService {
   }
 
   /**
-   * Soft delete order
+   * Soft delete an order by setting its deletedAt timestamp.
+   *
+   * Orders that are still active (PENDING, PREPARING, READY) cannot be deleted
+   * directly — they must be cancelled first via updateOrderStatus so that any
+   * associated table is properly freed back to AVAILABLE.
+   *
+   * Orders that are already resolved (COMPLETED, CANCELLED, SERVED, DELIVERED)
+   * are safe to delete since their table has already been released.
+   *
+   * @param restaurantId - The restaurant the order belongs to.
+   * @param orderId      - The ID of the order to soft delete.
+   *
+   * @throws {NotFoundError}   If the order does not exist or belongs to a different restaurant.
+   * @throws {BadRequestError} If the order is still active and must be cancelled first.
    */
   async deleteOrder(restaurantId: string, orderId: string) {
+    // Step 1: Fetch the order and verify it belongs to this restaurant
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, restaurantId, deletedAt: null },
+    });
+
+    if (!order) {
+      throw new NotFoundError("Order not found.");
+    }
+
+    // Step 2: Block deletion of active orders to prevent orphaned tables.
+    // These statuses mean the order is still in progress and may have a
+    // table locked as OCCUPIED. The caller must cancel the order first,
+    // which will free the table through updateOrderStatus.
+    const activeStatuses = ["PENDING", "PREPARING", "READY"];
+
+    if (activeStatuses.includes(order.status)) {
+      throw new BadRequestError(
+        `Cannot delete an order with status ${order.status}. ` +
+          `Cancel the order first before deleting it.`,
+      );
+    }
+
+    // Step 3: Safe to soft delete — table is already free at this point
     try {
       return await prisma.order.update({
-        where: { id: orderId, restaurantId, deletedAt: null },
+        where: { id: orderId },
         data: { deletedAt: new Date() },
       });
-    } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError("Order not found");
+    } catch (error: unknown) {
+      // P2025: order was deleted by another request between our check and update
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        (error as any).code === "P2025"
+      ) {
+        throw new NotFoundError("Order no longer exists.");
       }
       throw error;
     }
