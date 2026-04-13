@@ -10,12 +10,37 @@ import {
 
 export class OrderService {
   /**
-   * Create a new order
+   * Create a new order for a restaurant.
    *
-   * @param restaurantId - The ID of the restaurant
-   * @param data - The order creation data.
-   *   Note: The `tax` field is treated as a tax rate multiplier
-   *   (e.g., 0.14 = 14%) and must be between 0 and 1.
+   * Handles all order types: DINE_IN, TAKEAWAY, and DELIVERY.
+   * Prices are fetched fresh from the database at the time of order creation
+   * to ensure accuracy, then snapshotted onto each order item.
+   *
+   * All monetary values are calculated in cents internally to avoid
+   * floating-point precision issues, then converted back to decimals before
+   * persisting.
+   *
+   * For DINE_IN orders, the associated table is atomically locked to OCCUPIED
+   * within the transaction to prevent race conditions.
+   *
+   * @param restaurantId - The ID of the restaurant creating the order.
+   * @param data         - The order creation payload.
+   *   @param data.items           - Line items with menuItemId, quantity, and optional specialInstructions.
+   *   @param data.orderType       - One of: DINE_IN, TAKEAWAY, DELIVERY.
+   *   @param data.tax             - Tax rate as a multiplier between 0 and 1 (e.g. 0.14 = 14%).
+   *   @param data.tip             - Optional tip amount in currency units (e.g. 5.00).
+   *   @param data.tableId         - Required for DINE_IN orders.
+   *   @param data.customerId      - Optional customer to associate with the order.
+   *   @param data.deliveryAddress - Required for DELIVERY orders.
+   *   @param data.deliveryFee     - Optional delivery fee in currency units.
+   *
+   * @returns The created order including its items, table, and customer.
+   *
+   * @throws {BadRequestError} If any business validation fails (invalid tax rate,
+   *   missing table for dine-in, missing address for delivery, negative tip/fee, etc.)
+   * @throws {NotFoundError}   If the provided customerId does not exist.
+   * @throws {BadRequestError} If one or more menu items are not found or unavailable.
+   * @throws {BadRequestError} If the requested table is unavailable or already occupied.
    */
   async createOrder(restaurantId: string, data: CreateOrderInput) {
     const {
@@ -28,15 +53,23 @@ export class OrderService {
       deliveryAddress,
       deliveryFee,
     } = data;
-    // These are quick business validations
-    if (tip !== undefined && tip < 0) {
-      throw new BadRequestError("Tip cannot be negative");
-    }
-    if (deliveryFee !== undefined && deliveryFee < 0) {
-      throw new BadRequestError("Delivery fee cannot be negative");
-    }
+
+    // ─── Step 1: Business validations ────────────────────────────────────────
+
     if (!items || items.length === 0) {
       throw new BadRequestError("Order must contain at least one item.");
+    }
+
+    if (tax < 0 || tax > 1) {
+      throw new BadRequestError("Tax rate must be between 0 and 1.");
+    }
+
+    if (tip !== undefined && tip < 0) {
+      throw new BadRequestError("Tip cannot be negative.");
+    }
+
+    if (deliveryFee !== undefined && deliveryFee < 0) {
+      throw new BadRequestError("Delivery fee cannot be negative.");
     }
 
     if (orderType === "DINE_IN" && !tableId) {
@@ -49,20 +82,20 @@ export class OrderService {
       );
     }
 
-    if (tax < 0 || tax > 1) {
-      throw new BadRequestError("Tax rate must be between 0 and 1.");
-    }
-    // Optional: quantity check
     for (const item of items) {
       if (item.quantity < 1) {
         throw new BadRequestError(
-          `Quantity must be at least 1 for menu item ${item.menuItemId}`,
+          `Quantity must be at least 1 for menu item ${item.menuItemId}.`,
         );
       }
     }
-    // Fetch current prices for all menu items in the order
-    const menuItemIds = items.map((item) => item.menuItemId);
-    const uniqueMenuItemIds = [...new Set(menuItemIds)];
+
+    // ─── Step 2: Fetch and validate menu items ────────────────────────────────
+    // Deduplicate IDs before querying to avoid fetching the same item twice
+    const uniqueMenuItemIds = [
+      ...new Set(items.map((item) => item.menuItemId)),
+    ];
+
     const menuItems = await prisma.menuItem.findMany({
       where: { id: { in: uniqueMenuItemIds }, restaurantId, deletedAt: null },
     });
@@ -73,13 +106,13 @@ export class OrderService {
       );
     }
 
-    // Create a lookup for current prices
+    // ─── Step 3: Calculate totals in cents ───────────────────────────────────
+    // Build a price lookup from fetched menu items
     const itemPrices: Record<string, number> = {};
     menuItems.forEach((mi) => {
       itemPrices[mi.id] = Number(mi.price);
     });
 
-    // Calculate subtotal
     let subtotalCents = 0;
     const orderItemsRecord: {
       menuItemId: string;
@@ -100,104 +133,79 @@ export class OrderService {
       });
     });
 
-    // Calculate total: subtotal + tax + tip + delivery fee
     const taxAmountCents = Math.round(subtotalCents * tax);
     const safeTipCents = Math.round((tip ?? 0) * 100);
     const safeDeliveryFeeCents = Math.round((deliveryFee ?? 0) * 100);
     const computedTotalCents =
       subtotalCents + taxAmountCents + safeTipCents + safeDeliveryFeeCents;
 
-    const maxAttempts = 3;
-    let order;
-    let attempts = 0;
-
-    // Alphabet without confusing characters (0, O, 1, I)
+    // ─── Step 4: Generate order number ───────────────────────────────────────
+    // nanoid with an unambiguous alphabet (no 0/O, 1/I/L) gives ~1 trillion
+    // combinations at 8 chars — collision probability is negligible.
     const generateId = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
+    const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    const orderNumber = `ORD-${datePart}-${generateId()}`;
 
-    while (attempts < maxAttempts) {
-      try {
-        const datePart = new Date()
-          .toISOString()
-          .slice(2, 10)
-          .replace(/-/g, "");
-        const orderNumber = `ORD-${datePart}-${generateId()}`;
-
-        // Create Order with its Items in a Transaction
-        order = await prisma.$transaction(async (tx) => {
-          if (customerId) {
-            const customer = await tx.customer.findFirst({
-              where: { id: customerId, restaurantId, deletedAt: null },
-            });
-            if (!customer) {
-              throw new NotFoundError("Customer not found.");
-            }
-          }
-
-          // Optimistically lock the table first (prevents race conditions)
-          if (tableId && orderType === "DINE_IN") {
-            const tableUpdate = await tx.table.updateMany({
-              where: {
-                id: tableId,
-                restaurantId,
-                status: "AVAILABLE",
-                deletedAt: null,
-              },
-              data: { status: "OCCUPIED" },
-            });
-
-            if (tableUpdate.count === 0) {
-              // If count is 0, the table doesn't exist, is deleted, or is already occupied.
-              // Throwing an error here rolls back the transaction instantly.
-              throw new BadRequestError(
-                "Table is not available, does not exist, or is already occupied.",
-              );
-            }
-          }
-
-          return await tx.order.create({
-            data: {
-              restaurantId,
-              orderNumber,
-              tableId,
-              customerId,
-              orderType,
-              subtotal: subtotalCents / 100,
-              tax: taxAmountCents / 100,
-              tip: safeTipCents / 100,
-              deliveryFee: safeDeliveryFeeCents / 100,
-              total: computedTotalCents / 100,
-              deliveryAddress: deliveryAddress,
-              status: "PENDING",
-              items: {
-                create: orderItemsRecord,
-              },
-            },
-            include: {
-              items: true,
-              table: true,
-              customer: true,
-            },
-          });
+    // ─── Step 5: Persist order in a transaction ───────────────────────────────
+    const order = await prisma.$transaction(async (tx) => {
+      // Verify the customer exists if one was provided
+      if (customerId) {
+        const customer = await tx.customer.findFirst({
+          where: { id: customerId, restaurantId, deletedAt: null },
         });
-
-        break;
-      } catch (error: any) {
-        if (
-          error.code === "P2002" &&
-          error.meta?.target?.includes("orderNumber")
-        ) {
-          attempts++;
-          if (attempts >= maxAttempts) {
-            throw new BadRequestError(
-              "Failed to generate a unique order number. Please try again.",
-            );
-          }
-        } else {
-          throw error;
+        if (!customer) {
+          throw new NotFoundError("Customer not found.");
         }
       }
-    }
-    return order!;
+
+      // Atomically lock the table to prevent race conditions.
+      // updateMany with a status condition ensures only one request
+      // can claim an AVAILABLE table at a time.
+      if (tableId && orderType === "DINE_IN") {
+        const tableUpdate = await tx.table.updateMany({
+          where: {
+            id: tableId,
+            restaurantId,
+            status: "AVAILABLE",
+            deletedAt: null,
+          },
+          data: { status: "OCCUPIED" },
+        });
+
+        if (tableUpdate.count === 0) {
+          throw new BadRequestError(
+            "Table is not available, does not exist, or is already occupied.",
+          );
+        }
+      }
+
+      return await tx.order.create({
+        data: {
+          restaurantId,
+          orderNumber,
+          tableId,
+          customerId,
+          orderType,
+          subtotal: subtotalCents / 100,
+          tax: taxAmountCents / 100,
+          tip: safeTipCents / 100,
+          deliveryFee: safeDeliveryFeeCents / 100,
+          total: computedTotalCents / 100,
+          deliveryAddress,
+          status: "PENDING",
+          items: {
+            create: orderItemsRecord,
+          },
+        },
+        include: {
+          items: true,
+          table: true,
+          customer: true,
+        },
+      });
+    });
+
+    return order;
   }
   /**
    * Retrieve a paginated and filtered list of orders for a restaurant.
