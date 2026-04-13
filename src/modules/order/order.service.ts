@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { customAlphabet } from "nanoid";
 import { Prisma } from "@prisma/client";
 import { NotFoundError, BadRequestError } from "../../utils/errors";
 import prisma from "../../config/database";
@@ -101,26 +101,26 @@ export class OrderService {
     });
 
     // Calculate total: subtotal + tax + tip + delivery fee
-    // Note: If tax is provided as a percentage (e.g., 0.14), we calculate it against subtotal. If it's a fixed amount, it needs adjustment. Let's assume tax here is a FIXED rate multiplier.
     const taxAmountCents = Math.round(subtotalCents * tax);
     const safeTipCents = Math.round((tip ?? 0) * 100);
     const safeDeliveryFeeCents = Math.round((deliveryFee ?? 0) * 100);
-    const computedTotalCents = subtotalCents + taxAmountCents + safeTipCents + safeDeliveryFeeCents;
+    const computedTotalCents =
+      subtotalCents + taxAmountCents + safeTipCents + safeDeliveryFeeCents;
 
-    // Generate up to 3 candidate order numbers upfront
-    const maxAttempts = 10; // changes from 3 to 10
-    const orderNumberCandidates = Array.from({ length: maxAttempts }, () => {
-      const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
-      const randomPart = crypto.randomBytes(4).toString("hex").toUpperCase(); // randomBytes changes from 3 to 4
-      return `ORD-${datePart}-${randomPart}`;
-    });
-
+    const maxAttempts = 3;
     let order;
     let attempts = 0;
 
+    // Alphabet without confusing characters (0, O, 1, I)
+    const generateId = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
+
     while (attempts < maxAttempts) {
       try {
-        const orderNumber = orderNumberCandidates[attempts];
+        const datePart = new Date()
+          .toISOString()
+          .slice(2, 10)
+          .replace(/-/g, "");
+        const orderNumber = `ORD-${datePart}-${generateId()}`;
 
         // Create Order with its Items in a Transaction
         order = await prisma.$transaction(async (tx) => {
@@ -288,13 +288,44 @@ export class OrderService {
   }
 
   /**
-   * Update order status
+   * Update the status of an existing order.
+   *
+   * Enforces strict status transition rules to ensure orders follow
+   * a valid lifecycle. Invalid transitions are rejected before any
+   * database interaction occurs.
+   *
+   * Valid transitions:
+   *   PENDING    → PREPARING | CANCELLED
+   *   PREPARING  → READY     | CANCELLED
+   *   READY      → SERVED    | DELIVERED
+   *   SERVED     → COMPLETED
+   *   DELIVERED  → COMPLETED
+   *
+   * Side effects:
+   *   - Sets the relevant timestamp field (e.g. acceptedAt, preparedAt) on transition.
+   *   - Frees the associated table back to AVAILABLE when order is CANCELLED or COMPLETED.
+   *
+   * @param restaurantId - The restaurant the order belongs to.
+   * @param orderId      - The ID of the order to update.
+   * @param data         - Contains the target `status` to transition to.
+   *
+   * @throws {NotFoundError}    If the order does not exist or belongs to a different restaurant.
+   * @throws {BadRequestError}  If the requested status transition is not permitted.
    */
   async updateOrderStatus(
     restaurantId: string,
     orderId: string,
     data: UpdateOrderStatusInput,
   ) {
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      PENDING: ["PREPARING", "CANCELLED"],
+      PREPARING: ["READY", "CANCELLED"],
+      READY: ["SERVED", "DELIVERED"],
+      SERVED: ["COMPLETED"],
+      DELIVERED: ["COMPLETED"],
+    };
+
+    // Step 1: Fetch the current order and verify it belongs to this restaurant
     const currentOrder = await prisma.order.findUnique({
       where: { id: orderId },
     });
@@ -304,64 +335,74 @@ export class OrderService {
       currentOrder.restaurantId !== restaurantId ||
       currentOrder.deletedAt
     ) {
-      throw new NotFoundError("Order not found");
+      throw new NotFoundError("Order not found.");
     }
 
-    const VALID_TRANSITIONS: Record<string, string[]> = {
-      PENDING: ["PREPARING", "CANCELLED"],
-      PREPARING: ["READY", "CANCELLED"],
-      READY: ["SERVED", "DELIVERED"],
-      SERVED: ["COMPLETED"],
-      DELIVERED: ["COMPLETED"],
+    // Step 2: Validate the transition upfront before touching the DB
+    // Check what statuses the current order is allowed to move to
+    const allowedTransitions = VALID_TRANSITIONS[currentOrder.status] ?? [];
+
+    if (!allowedTransitions.includes(data.status as string)) {
+      throw new BadRequestError(
+        `Cannot transition from ${currentOrder.status} to ${data.status}. ` +
+          `Allowed transitions: ${allowedTransitions.join(", ") || "none"}.`,
+      );
+    }
+
+    // Step 3: Build the update payload with the relevant timestamp
+    const now = new Date();
+    const updateData: Prisma.OrderUpdateInput = { status: data.status };
+
+    const statusTimestamps: Record<string, keyof Prisma.OrderUpdateInput> = {
+      PREPARING: "acceptedAt",
+      READY: "preparedAt",
+      SERVED: "servedAt",
+      DELIVERED: "deliveredAt",
+      COMPLETED: "completedAt",
+      CANCELLED: "cancelledAt",
     };
 
-    const validPreviousStatuses = Object.entries(VALID_TRANSITIONS)
-      .filter(([_, targets]) => targets.includes(data.status as string))
-      .map(([prev]) => prev as any);
-
-    if (validPreviousStatuses.length === 0) {
-      throw new BadRequestError(`Invalid target status: ${data.status}`);
+    const timestampField = statusTimestamps[data.status as string];
+    if (timestampField) {
+      (updateData as any)[timestampField] = now;
     }
 
-    // Determine which timestamp to update based on the status change
-    const updateData: Prisma.OrderUpdateInput = { status: data.status };
-    const now = new Date();
-
-    if (data.status === "PREPARING") updateData.acceptedAt = now;
-    if (data.status === "READY") updateData.preparedAt = now;
-    if (data.status === "SERVED") updateData.servedAt = now;
-    if (data.status === "DELIVERED") updateData.deliveredAt = now;
-    if (data.status === "COMPLETED") updateData.completedAt = now;
-    if (data.status === "CANCELLED") updateData.cancelledAt = now;
-
+    // Step 4: Apply the update and handle table release in a transaction
     try {
-      const order = await prisma.$transaction(async (tx) => {
-        const updatedOrder = await tx.order.update({
+      const updatedOrder = await prisma.$transaction(async (tx) => {
+        const order = await tx.order.update({
           where: {
             id: orderId,
             restaurantId,
-            status: { in: validPreviousStatuses },
-            deletedAt: null, // Exclude soft-deleted orders
+            deletedAt: null,
           },
           data: updateData,
         });
 
-        // Free the table if the order is cancelled
-        if (data.status === "CANCELLED" && updatedOrder.tableId) {
+        // Free the table when the order is resolved (completed or cancelled)
+        const isOrderResolved =
+          data.status === "COMPLETED" || data.status === "CANCELLED";
+
+        if (isOrderResolved && order.tableId) {
           await tx.table.updateMany({
-            where: { id: updatedOrder.tableId },
+            where: { id: order.tableId },
             data: { status: "AVAILABLE" },
           });
         }
 
-        return updatedOrder;
+        return order;
       });
-      return order;
-    } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new BadRequestError(
-          `Invalid status transition from ${currentOrder.status} to ${data.status}`,
-        );
+
+      return updatedOrder;
+    } catch (error: unknown) {
+      // P2025: Record not found — should be rare given our upfront check,
+      // but can happen in a race condition where the order is deleted mid-request
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        (error as any).code === "P2025"
+      ) {
+        throw new NotFoundError("Order no longer exists.");
       }
       throw error;
     }
