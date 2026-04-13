@@ -29,6 +29,12 @@ export class OrderService {
       deliveryFee,
     } = data;
     // These are quick business validations
+    if (tip !== undefined && tip < 0) {
+      throw new BadRequestError("Tip cannot be negative");
+    }
+    if (deliveryFee !== undefined && deliveryFee < 0) {
+      throw new BadRequestError("Delivery fee cannot be negative");
+    }
     if (!items || items.length === 0) {
       throw new BadRequestError("Order must contain at least one item.");
     }
@@ -74,7 +80,7 @@ export class OrderService {
     });
 
     // Calculate subtotal
-    let subtotal = 0;
+    let subtotalCents = 0;
     const orderItemsRecord: {
       menuItemId: string;
       quantity: number;
@@ -84,7 +90,8 @@ export class OrderService {
 
     items.forEach((item) => {
       const itemPrice = itemPrices[item.menuItemId];
-      subtotal += itemPrice * item.quantity;
+      const itemPriceCents = Math.round(itemPrice * 100);
+      subtotalCents += itemPriceCents * item.quantity;
       orderItemsRecord.push({
         menuItemId: item.menuItemId,
         quantity: item.quantity,
@@ -95,13 +102,10 @@ export class OrderService {
 
     // Calculate total: subtotal + tax + tip + delivery fee
     // Note: If tax is provided as a percentage (e.g., 0.14), we calculate it against subtotal. If it's a fixed amount, it needs adjustment. Let's assume tax here is a FIXED rate multiplier.
-    if (tax > 1) {
-      throw new BadRequestError("Tax cannot be greater than 1.");
-    }
-    const taxAmount = subtotal * tax;
-    const safeTip = tip ?? 0;
-    const safeDeliveryFee = deliveryFee ?? 0;
-    const computedTotal = subtotal + taxAmount + safeTip + safeDeliveryFee;
+    const taxAmountCents = Math.round(subtotalCents * tax);
+    const safeTipCents = Math.round((tip ?? 0) * 100);
+    const safeDeliveryFeeCents = Math.round((deliveryFee ?? 0) * 100);
+    const computedTotalCents = subtotalCents + taxAmountCents + safeTipCents + safeDeliveryFeeCents;
 
     // Generate up to 3 candidate order numbers upfront
     const maxAttempts = 10; // changes from 3 to 10
@@ -157,11 +161,11 @@ export class OrderService {
               tableId,
               customerId,
               orderType,
-              subtotal: subtotal,
-              tax: taxAmount,
-              tip: safeTip,
-              deliveryFee: safeDeliveryFee,
-              total: computedTotal,
+              subtotal: subtotalCents / 100,
+              tax: taxAmountCents / 100,
+              tip: safeTipCents / 100,
+              deliveryFee: safeDeliveryFeeCents / 100,
+              total: computedTotalCents / 100,
               deliveryAddress: deliveryAddress,
               status: "PENDING",
               items: {
@@ -193,12 +197,7 @@ export class OrderService {
         }
       }
     }
-
-    if (!order) {
-      throw new BadRequestError("Failed to create order.");
-    }
-
-    return order;
+    return order!;
   }
 
   /**
@@ -296,6 +295,18 @@ export class OrderService {
     orderId: string,
     data: UpdateOrderStatusInput,
   ) {
+    const currentOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (
+      !currentOrder ||
+      currentOrder.restaurantId !== restaurantId ||
+      currentOrder.deletedAt
+    ) {
+      throw new NotFoundError("Order not found");
+    }
+
     const VALID_TRANSITIONS: Record<string, string[]> = {
       PENDING: ["PREPARING", "CANCELLED"],
       PREPARING: ["READY", "CANCELLED"],
@@ -348,18 +359,6 @@ export class OrderService {
       return order;
     } catch (error: any) {
       if (error.code === "P2025") {
-        const currentOrder = await prisma.order.findUnique({
-          where: { id: orderId },
-        });
-
-        if (
-          !currentOrder ||
-          currentOrder.restaurantId !== restaurantId ||
-          currentOrder.deletedAt
-        ) {
-          throw new NotFoundError("Order not found");
-        }
-
         throw new BadRequestError(
           `Invalid status transition from ${currentOrder.status} to ${data.status}`,
         );
