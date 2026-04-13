@@ -199,9 +199,21 @@ export class OrderService {
     }
     return order!;
   }
-
   /**
-   * Get paginated and filtered orders
+   * Retrieve a paginated and filtered list of orders for a restaurant.
+   *
+   * Filtering is applied via the query object — all fields are optional.
+   * If no filters are provided, all non-deleted orders are returned.
+   *
+   * Status and orderType validation is handled upstream by the ListOrderQuery
+   * schema and does not need to be re-validated here.
+   *
+   * @param restaurantId - The restaurant to fetch orders for.
+   * @param query        - Optional filters: status, orderType, tableId, customerId.
+   * @param page         - Page number for pagination (default: 1).
+   * @param limit        - Number of orders per page (default: 10).
+   *
+   * @returns Paginated orders with meta information (total, page, limit, totalPages).
    */
   async getOrders(
     restaurantId: string,
@@ -209,21 +221,6 @@ export class OrderService {
     page = 1,
     limit = 10,
   ) {
-    if (query.status) {
-      const validStatuses = [
-        "PENDING",
-        "PREPARING",
-        "READY",
-        "SERVED",
-        "DELIVERED",
-        "COMPLETED",
-        "CANCELLED",
-      ];
-      if (!validStatuses.includes(query.status)) {
-        throw new BadRequestError("Invalid status filter.");
-      }
-    }
-
     const skip = (page - 1) * limit;
 
     const where: Prisma.OrderWhereInput = {
@@ -261,7 +258,6 @@ export class OrderService {
       },
     };
   }
-
   /**
    * Get single order by ID
    */
