@@ -103,7 +103,7 @@ export const updateOrderSchema = z.object({
   orderType: orderTypeEnum.optional(),
   tax: z.number().min(0).max(1).optional(),
   tip: z.number().min(0).optional(),
-  deliveryAddress: z.string().max(5).optional(),
+  deliveryAddress: z.string().min(5).optional(),
   deliveryFee: z.number().min(0).optional(),
 });
 
