@@ -101,7 +101,7 @@ export class OrderService {
     ];
 
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: uniqueMenuItemIds }, restaurantId, deletedAt: null },
+      where: { id: { in: uniqueMenuItemIds }, restaurantId, available: true, deletedAt: null },
     });
 
     if (menuItems.length !== uniqueMenuItemIds.length) {
