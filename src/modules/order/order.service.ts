@@ -456,7 +456,7 @@ export class OrderService {
     // Step 3: Safe to soft delete — table is already free at this point
     try {
       return await prisma.order.update({
-        where: { id: orderId },
+        where: { id: orderId, restaurantId },
         data: { deletedAt: new Date() },
       });
     } catch (error: unknown) {
