@@ -8,6 +8,10 @@ import {
   ListOrderQuery,
 } from "./order.schema";
 
+// nanoid generator with an unambiguous alphabet (no 0/O, 1/I/L).
+// ~852 billion combinations at 8 chars — collision probability is negligible.
+const generateId = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
+
 export class OrderService {
   /**
    * Create a new order for a restaurant.
@@ -140,9 +144,6 @@ export class OrderService {
       subtotalCents + taxAmountCents + safeTipCents + safeDeliveryFeeCents;
 
     // ─── Step 4: Generate order number ───────────────────────────────────────
-    // nanoid with an unambiguous alphabet (no 0/O, 1/I/L) gives ~1 trillion
-    // combinations at 8 chars — collision probability is negligible.
-    const generateId = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
     const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     const orderNumber = `ORD-${datePart}-${generateId()}`;
 
