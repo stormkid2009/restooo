@@ -379,6 +379,7 @@ export class OrderService {
             id: orderId,
             restaurantId,
             deletedAt: null,
+            status: currentOrder.status, // Optimistic lock: only update if status hasn't changed
           },
           data: updateData,
         });
@@ -406,7 +407,9 @@ export class OrderService {
         error !== null &&
         (error as any).code === "P2025"
       ) {
-        throw new NotFoundError("Order no longer exists.");
+        throw new NotFoundError(
+          "Order status was modified by another request. Please retry.",
+        );
       }
       throw error;
     }
