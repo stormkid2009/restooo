@@ -14,26 +14,12 @@ This document tracks planned features, improvements, and technical debt for the 
   - Production: Generic errors ("Unauthorized") for security
   - File: `src/middleware/authenticate.ts`
 
-- [&check;] **Token Refresh Mechanism**
-  - Implement short-lived access tokens (15 minutes)
-  - Implement long-lived refresh tokens (7 days)
-  - Create endpoint: `POST /api/v1/auth/refresh`
-  - Store refresh tokens in database or Redis
-  - Rotate refresh tokens on each use
-  - File: `src/modules/auth/auth.controller.ts`, `src/modules/auth/auth.routes.ts`
-
 - [ ] **Token Blacklist/Revocation**
   - Implement proper server-side logout
   - Store revoked tokens in Redis with TTL
   - Check blacklist in `authMiddleware` before verifying
   - Create endpoint: `POST /api/v1/auth/logout` (server-side)
   - File: `src/middleware/authenticate.ts`
-
-- [&check;] **Implement /me and /logout Endpoints**
-  - Uncomment routes in `src/routes/authRoutes.ts`
-  - Create `authController.me` method (return current user info)
-  - Create `authController.logout` method (blacklist token)
-  - File: `src/modules/auth/auth.controller.ts`
 
 ### Medium Priority
 
@@ -142,19 +128,7 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [&check;] **Implement Menu CRUD Operations**
-  - Create `menuService.ts` with business logic
-  - Create `menuController.ts` with HTTP handlers
-  - Create `menuRoutes.ts` with endpoints:
-    - `GET /api/v1/menu` - List all menu items (with filters)
-    - `GET /api/v1/menu/:id` - Get single menu item
-    - `POST /api/v1/menu` - Create menu item (ADMIN, MANAGER)
-    - `PUT /api/v1/menu/:id` - Update menu item (ADMIN, MANAGER)
-    - `DELETE /api/v1/menu/:id` - Delete menu item (ADMIN)
-  - Add validation schemas with Zod
-  - Implement filtering (category, available, price range)
-  - Implement pagination
-  - Files: `src/modules/menu/menu.service.ts`, `src/modules/menu/menu.controller.ts`, `src/modules/menu/menu.routes.ts`
+*(All high-priority menu tasks completed)*
 
 ### Medium Priority
 
@@ -184,20 +158,7 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [ ] **Implement Order CRUD Operations**
-  - Create `src/modules/order` directory
-  - Create `order.service.ts` with business logic
-  - Create `orderController.ts` with HTTP handlers
-  - Create `orderRoutes.ts` with endpoints:
-    - `GET /api/v1/orders` - List all orders (with filters)
-    - `GET /api/v1/orders/:id` - Get single order
-    - `POST /api/v1/orders` - Create new order
-    - `PATCH /api/v1/orders/:id/status` - Update order status
-    - `DELETE /api/v1/orders/:id` - Cancel order
-  - Implement order number generation
-  - Calculate totals (subtotal, tax, tip, total)
-  - Validate menu items exist and are available
-  - Files: `src/modules/order/order.service.ts`, `src/modules/order/order.controller.ts`, `src/modules/order/order.routes.ts`
+*(All high-priority order tasks completed)*
 
 ### Medium Priority
 
@@ -276,18 +237,7 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [ ] **Implement Customer CRUD Operations**
-  - Create `src/modules/customer` directory
-  - Create `customer.service.ts` with business logic
-  - Create `customerController.ts` with HTTP handlers
-  - Create `customerRoutes.ts` with endpoints:
-    - `GET /api/v1/customers` - List all customers
-    - `GET /api/v1/customers/:id` - Get single customer
-    - `POST /api/v1/customers` - Create customer
-    - `PUT /api/v1/customers/:id` - Update customer
-    - `DELETE /api/v1/customers/:id` - Delete customer
-    - `GET /api/v1/customers/:id/orders` - Get order history
-  - Files: `src/modules/customer/customer.service.ts`, `src/modules/customer/customer.controller.ts`, `src/modules/customer/customer.routes.ts`
+*(All high-priority customer tasks completed)*
 
 ### Medium Priority
 
@@ -311,18 +261,7 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [ ] **Implement Table CRUD Operations**
-  - Create `src/modules/table` directory
-  - Create `table.service.ts` with business logic
-  - Create `tableController.ts` with HTTP handlers
-  - Create `tableRoutes.ts` with endpoints:
-    - `GET /api/v1/tables` - List all tables
-    - `GET /api/v1/tables/:id` - Get single table
-    - `POST /api/v1/tables` - Create table (ADMIN, MANAGER)
-    - `PUT /api/v1/tables/:id` - Update table (ADMIN, MANAGER)
-    - `PATCH /api/v1/tables/:id/status` - Update table status
-    - `DELETE /api/v1/tables/:id` - Delete table (ADMIN)
-  - Files: `src/modules/table/table.service.ts`, `src/modules/table/table.controller.ts`, `src/modules/table/table.routes.ts`
+*(All high-priority table tasks completed)*
 
 ### Medium Priority
 
@@ -338,16 +277,7 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### High Priority
 
-- [&check;] **Implement Staff CRUD Operations**
-  - Handled by `src/modules/user` (Roles: ADMIN, MANAGER, STAFF, CHEF)
-  - `staff.controller.ts` not needed (use userController)
-  - Create `staffRoutes.ts` with endpoints:
-    - `GET /api/v1/staff` - List all staff (ADMIN, MANAGER)
-    - `GET /api/v1/staff/:id` - Get single staff member
-    - `POST /api/v1/staff` - Create staff member (ADMIN)
-    - `PUT /api/v1/staff/:id` - Update staff member (ADMIN, MANAGER)
-    - `DELETE /api/v1/staff/:id` - Delete staff member (ADMIN)
-  - Files: `src/modules/user/user.service.ts`, `src/modules/user/user.controller.ts`, `src/modules/user/user.routes.ts`
+*(All high-priority staff tasks completed)*
 
 ### Medium Priority
 
