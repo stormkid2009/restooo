@@ -207,6 +207,12 @@ This document tracks planned features, improvements, and technical debt for the 
   - Wire up when delivery features are implemented
   - File: `src/modules/order/order.service.ts`
 
+- [ ] **Implement `updateOrder` Method**
+  - `updateOrderSchema` already exists in `order.schema.ts` but has no corresponding service method
+  - Allow editing order details (tip, delivery address, delivery fee) before the order is prepared
+  - Should only be allowed while order is in `PENDING` status
+  - Files: `src/modules/order/order.service.ts`, `src/modules/order/order.controller.ts`, `src/modules/order/order.routes.ts`
+
 - [ ] **Real-time Order Updates**
   - Implement WebSocket for live order updates
   - Notify kitchen when new order arrives
