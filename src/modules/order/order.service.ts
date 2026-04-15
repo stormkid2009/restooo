@@ -247,7 +247,6 @@ export class OrderService {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          items: true,
           table: true,
           customer: true,
           employee: true,
