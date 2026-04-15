@@ -201,6 +201,12 @@ This document tracks planned features, improvements, and technical debt for the 
 
 ### Medium Priority
 
+- [ ] **Add `OUT_FOR_DELIVERY` Status Transition**
+  - The `OUT_FOR_DELIVERY` status is defined in the Prisma enum and Zod schema but not handled in `VALID_TRANSITIONS` in `order.service.ts`
+  - Add transitions: `READY → OUT_FOR_DELIVERY`, `OUT_FOR_DELIVERY → DELIVERED`
+  - Wire up when delivery features are implemented
+  - File: `src/modules/order/order.service.ts`
+
 - [ ] **Real-time Order Updates**
   - Implement WebSocket for live order updates
   - Notify kitchen when new order arrives
