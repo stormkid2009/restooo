@@ -262,7 +262,6 @@ model Order {
 
   // Timeline tracking (for analytics & customer updates)
   estimatedTime DateTime?
-  placedAt      DateTime? // When customer placed order
   acceptedAt    DateTime? // When restaurant accepted
   preparedAt    DateTime? // When kitchen finished
   servedAt      DateTime? // When served to customer (dine-in)
