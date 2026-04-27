@@ -249,8 +249,12 @@ export class OrderService {
         orderBy: { createdAt: "desc" },
         include: {
           table: true,
-          customer: true,
-          employee: true,
+          customer: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
+          employee: {
+            select: { id: true, name: true, email: true, role: true },
+          },
         },
       }),
       prisma.order.count({ where }),
@@ -279,8 +283,12 @@ export class OrderService {
           },
         },
         table: true,
-        customer: true,
-        employee: true,
+        customer: {
+          select: { id: true, name: true, email: true, phone: true },
+        },
+        employee: {
+          select: { id: true, name: true, email: true, role: true },
+        },
       },
     });
 
