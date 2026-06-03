@@ -118,6 +118,7 @@ model Restaurant {
   ingredients  Ingredient[]
   inventory    Inventory[]
   deliveries   Delivery[]
+  auditLogs    AuditLog[]
 
   @@index([deletedAt]) // For filtering active restaurants
   @@map("restaurants")
@@ -454,4 +455,26 @@ model Delivery {
   @@index([restaurantId, status])
   @@index([restaurantId, deletedAt])
   @@map("deliveries")
+}
+
+// ════════════════════════════════════════════════════════════════
+// AUDIT LOGS
+// ════════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  entity       String   // e.g., "Reservation", "Order"
+  entityId     String
+  action       String   // e.g., "CREATE", "UPDATE", "DELETE", "UPDATE_STATUS"
+  details      Json?    // Stores what changed or payload
+  userId       String?  // The customerId or employeeId who made the change
+  restaurantId String
+  createdAt    DateTime @default(now())
+
+  // Relations
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([entity, entityId])
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@map("audit_logs")
 }

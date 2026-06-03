@@ -1,27 +1,33 @@
 import prisma from "../../config/database";
 import { CreateReservationInput, UpdateReservationInput, UpdateReservationStatusInput, GetReservationsQueryInput } from "./reservation.schema";
+import { Prisma, Reservation } from "@prisma/client";
+import { AppError, NotFoundError, ConflictError, BadRequestError } from "../../utils/errors";
+import { ReservationPolicy } from "./reservation.policy";
+import { withRetry } from "../../utils/withRetry";
+import { AuditLogger } from "../../utils/auditLogger";
 
 type ServiceResponse<T> =
   | { success: true; data: T; meta?: any }
   | { success: false; error: string; code?: number };
 
 class ReservationService {
-  private getDurationMs(): number {
-    const minutes = Number(process.env.DEFAULT_RESERVATION_DURATION_MINUTES) || 120;
-    return minutes * 60 * 1000;
-  }
-
   private async checkTableConflict(
-    tx: any, // Prisma client or transaction client
+    tx: Prisma.TransactionClient,
     tableId: string,
     scheduledAt: Date,
     restaurantId: string,
-    excludeReservationId?: string
+    excludeReservationId?: string,
+    lockTable = true
   ): Promise<boolean> {
     const start = new Date(scheduledAt);
-    const end = new Date(start.getTime() + this.getDurationMs());
+    const end = new Date(start.getTime() + ReservationPolicy.getDurationMs());
 
-    const where: any = {
+    if (lockTable) {
+      // Pessimistic Locking: Lock the table row so concurrent transactions wait here
+      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${tableId} FOR UPDATE`;
+    }
+
+    const where: Prisma.ReservationWhereInput = {
       tableId,
       restaurantId,
       deletedAt: null,
@@ -43,7 +49,7 @@ class ReservationService {
     return !!conflicting;
   }
 
-  async create(data: CreateReservationInput, restaurantId: string): Promise<ServiceResponse<any>> {
+  async create(data: CreateReservationInput, restaurantId: string): Promise<ServiceResponse<Reservation>> {
     try {
       if (!data.customerId && !data.guestName) {
         return {
@@ -55,49 +61,60 @@ class ReservationService {
 
       const scheduledAtDate = new Date(data.scheduledAt);
 
-      // Use a transaction for table availability check and creation
-      const result = await prisma.$transaction(async (tx) => {
-        if (data.tableId) {
-          const table = await tx.table.findFirst({
-            where: { id: data.tableId, restaurantId, deletedAt: null },
+      const result = await withRetry(() =>
+        prisma.$transaction(async (tx) => {
+          if (data.tableId) {
+            const table = await tx.table.findFirst({
+              where: { id: data.tableId, restaurantId, deletedAt: null },
+            });
+
+            if (!table) {
+              throw new NotFoundError("Table not found");
+            }
+
+            if (data.partySize > table.capacity) {
+              throw new ConflictError(`Table capacity (${table.capacity}) is less than party size (${data.partySize})`);
+            }
+
+            const hasConflict = await this.checkTableConflict(tx, data.tableId, scheduledAtDate, restaurantId);
+            if (hasConflict) {
+              throw new ConflictError("Table is already reserved for the requested time slot");
+            }
+          }
+
+          const reservation = await tx.reservation.create({
+            data: {
+              customerId: data.customerId,
+              guestName: data.guestName,
+              guestPhone: data.guestPhone,
+              tableId: data.tableId,
+              scheduledAt: scheduledAtDate,
+              partySize: data.partySize,
+              status: data.status,
+              specialRequests: data.specialRequests,
+              restaurantId,
+            },
+            include: { table: true, customer: true },
           });
 
-          if (!table) {
-            throw new Error("Table not found");
-          }
-
-          if (data.partySize > table.capacity) {
-            throw new Error(`Table capacity (${table.capacity}) is less than party size (${data.partySize})`);
-          }
-
-          const hasConflict = await this.checkTableConflict(tx, data.tableId, scheduledAtDate, restaurantId);
-          if (hasConflict) {
-            throw new Error("Table is already reserved for the requested time slot");
-          }
-        }
-
-        return await tx.reservation.create({
-          data: {
-            customerId: data.customerId,
-            guestName: data.guestName,
-            guestPhone: data.guestPhone,
-            tableId: data.tableId,
-            scheduledAt: scheduledAtDate,
-            partySize: data.partySize,
-            status: data.status,
-            specialRequests: data.specialRequests,
+          await AuditLogger.log(tx, {
+            entity: "Reservation",
+            entityId: reservation.id,
+            action: "CREATE",
+            userId: data.customerId,
             restaurantId,
-          },
-          include: { table: true, customer: true },
-        });
-      });
+            details: { ...data },
+          });
+
+          return reservation;
+        })
+      );
 
       return { success: true, data: result };
     } catch (error: any) {
       console.error("Create reservation error:", error);
-      if (error.message === "Table not found") return { success: false, error: error.message, code: 404 };
-      if (error.message.startsWith("Table capacity") || error.message.startsWith("Table is already")) {
-        return { success: false, error: error.message, code: 409 };
+      if (error instanceof AppError) {
+        return { success: false, error: error.message, code: error.statusCode };
       }
       return { success: false, error: "Failed to create reservation", code: 500 };
     }
@@ -106,9 +123,9 @@ class ReservationService {
   async list(
     filters: GetReservationsQueryInput,
     restaurantId: string,
-  ): Promise<ServiceResponse<any[]>> {
+  ): Promise<ServiceResponse<Reservation[]>> {
     try {
-      const where: any = { restaurantId, deletedAt: null };
+      const where: Prisma.ReservationWhereInput = { restaurantId, deletedAt: null };
 
       if (filters.status) {
         where.status = filters.status;
@@ -132,16 +149,17 @@ class ReservationService {
       const limit = filters.limit || 10;
       const skip = (page - 1) * limit;
 
-      const [items, totalCount] = await prisma.$transaction([
-        prisma.reservation.findMany({
+      const { items, totalCount } = await prisma.$transaction(async (tx) => {
+        const items = await tx.reservation.findMany({
           where,
           include: { table: true, customer: true },
           orderBy: { scheduledAt: "asc" },
           skip,
           take: limit,
-        }),
-        prisma.reservation.count({ where }),
-      ]);
+        });
+        const totalCount = await tx.reservation.count({ where });
+        return { items, totalCount };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 
       return {
         success: true,
@@ -159,7 +177,7 @@ class ReservationService {
     }
   }
 
-  async getById(id: string, restaurantId: string): Promise<ServiceResponse<any>> {
+  async getById(id: string, restaurantId: string): Promise<ServiceResponse<Reservation>> {
     try {
       const reservation = await prisma.reservation.findFirst({
         where: { id, restaurantId, deletedAt: null },
@@ -181,67 +199,75 @@ class ReservationService {
     id: string,
     data: UpdateReservationInput,
     restaurantId: string,
-  ): Promise<ServiceResponse<any>> {
+  ): Promise<ServiceResponse<Reservation>> {
     try {
-      // Use transaction to ensure consistency
-      const result = await prisma.$transaction(async (tx) => {
-        const existing = await tx.reservation.findFirst({
-          where: { id, restaurantId, deletedAt: null },
-        });
-
-        if (!existing) {
-          throw new Error("Reservation not found");
-        }
-
-        if (existing.status !== "PENDING" && existing.status !== "CONFIRMED") {
-          throw new Error("Can only update pending or confirmed reservations");
-        }
-
-        const tableId = data.tableId || existing.tableId;
-        const scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : existing.scheduledAt;
-        const partySize = data.partySize || existing.partySize;
-
-        if (tableId) {
-          const table = await tx.table.findFirst({
-            where: { id: tableId, restaurantId, deletedAt: null },
+      const result = await withRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const existing = await tx.reservation.findFirst({
+            where: { id, restaurantId, deletedAt: null },
           });
 
-          if (!table) {
-            throw new Error("Table not found");
+          if (!existing) {
+            throw new NotFoundError("Reservation not found");
           }
 
-          if (partySize > table.capacity) {
-            throw new Error(`Table capacity (${table.capacity}) is less than party size (${partySize})`);
+          if (existing.status !== "PENDING" && existing.status !== "CONFIRMED") {
+            throw new BadRequestError("Can only update pending or confirmed reservations");
           }
 
-          if (data.scheduledAt || data.tableId) {
-            const hasConflict = await this.checkTableConflict(tx, tableId, scheduledAt, restaurantId, id);
-            if (hasConflict) {
-               throw new Error("Table is already reserved for the requested time slot");
+          const tableId = data.tableId || existing.tableId;
+          const scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : existing.scheduledAt;
+          const partySize = data.partySize ?? existing.partySize;
+
+          if (tableId) {
+            const table = await tx.table.findFirst({
+              where: { id: tableId, restaurantId, deletedAt: null },
+            });
+
+            if (!table) {
+              throw new NotFoundError("Table not found");
+            }
+
+            if (partySize > table.capacity) {
+              throw new ConflictError(`Table capacity (${table.capacity}) is less than party size (${partySize})`);
+            }
+
+            if (data.scheduledAt || data.tableId) {
+              const hasConflict = await this.checkTableConflict(tx, tableId, scheduledAt, restaurantId, id);
+              if (hasConflict) {
+                 throw new ConflictError("Table is already reserved for the requested time slot");
+              }
             }
           }
-        }
 
-        const updateData: any = { ...data };
-        if (data.scheduledAt) {
-          updateData.scheduledAt = scheduledAt;
-        }
+          const updateData: Prisma.ReservationUpdateInput = { ...data };
+          if (data.scheduledAt) {
+            updateData.scheduledAt = scheduledAt;
+          }
 
-        return await tx.reservation.update({
-          where: { id },
-          data: updateData,
-          include: { table: true, customer: true },
-        });
-      });
+          const updated = await tx.reservation.update({
+            where: { id },
+            data: updateData,
+            include: { table: true, customer: true },
+          });
+
+          await AuditLogger.log(tx, {
+            entity: "Reservation",
+            entityId: id,
+            action: "UPDATE",
+            restaurantId,
+            details: { ...data },
+          });
+
+          return updated;
+        })
+      );
 
       return { success: true, data: result };
     } catch (error: any) {
       console.error("Update reservation error:", error);
-      if (error.message === "Reservation not found" || error.message === "Table not found") {
-         return { success: false, error: error.message, code: 404 };
-      }
-      if (error.message.startsWith("Can only update") || error.message.startsWith("Table capacity") || error.message.startsWith("Table is already")) {
-         return { success: false, error: error.message, code: 400 };
+      if (error instanceof AppError) {
+         return { success: false, error: error.message, code: error.statusCode };
       }
       return { success: false, error: "Failed to update reservation", code: 500 };
     }
@@ -251,65 +277,78 @@ class ReservationService {
     id: string,
     data: UpdateReservationStatusInput,
     restaurantId: string,
-  ): Promise<ServiceResponse<any>> {
+  ): Promise<ServiceResponse<Reservation>> {
     try {
-      const existing = await prisma.reservation.findFirst({
-        where: { id, restaurantId, deletedAt: null },
+      const result = await prisma.$transaction(async (tx) => {
+        const existing = await tx.reservation.findFirst({
+          where: { id, restaurantId, deletedAt: null },
+        });
+
+        if (!existing) {
+          throw new NotFoundError("Reservation not found");
+        }
+
+        if (!ReservationPolicy.canTransition(existing.status, data.status)) {
+          throw new BadRequestError(`Cannot transition from ${existing.status} to ${data.status}`);
+        }
+
+        const updated = await tx.reservation.update({
+          where: { id },
+          data: { status: data.status },
+          include: { table: true, customer: true },
+        });
+
+        await AuditLogger.log(tx, {
+          entity: "Reservation",
+          entityId: id,
+          action: "UPDATE_STATUS",
+          restaurantId,
+          details: { from: existing.status, to: data.status },
+        });
+
+        return updated;
       });
 
-      if (!existing) {
-        return { success: false, error: "Reservation not found", code: 404 };
-      }
-
-      const validTransitions: Record<string, string[]> = {
-        PENDING: ["CONFIRMED", "CANCELLED"],
-        CONFIRMED: ["SEATED", "CANCELLED", "NO_SHOW"],
-        SEATED: ["COMPLETED", "CANCELLED"],
-        COMPLETED: [],
-        CANCELLED: [],
-        NO_SHOW: [],
-      };
-
-      const allowed = validTransitions[existing.status];
-      if (!allowed || !allowed.includes(data.status)) {
-        return {
-          success: false,
-          error: `Cannot transition from ${existing.status} to ${data.status}`,
-          code: 400,
-        };
-      }
-
-      const updated = await prisma.reservation.update({
-        where: { id },
-        data: { status: data.status },
-        include: { table: true, customer: true },
-      });
-
-      return { success: true, data: updated };
-    } catch (error) {
+      return { success: true, data: result };
+    } catch (error: any) {
       console.error("Update reservation status error:", error);
+      if (error instanceof AppError) {
+        return { success: false, error: error.message, code: error.statusCode };
+      }
       return { success: false, error: "Failed to update reservation status", code: 500 };
     }
   }
 
   async delete(id: string, restaurantId: string): Promise<ServiceResponse<void>> {
     try {
-      const existing = await prisma.reservation.findFirst({
-        where: { id, restaurantId, deletedAt: null },
-      });
+      await prisma.$transaction(async (tx) => {
+        const existing = await tx.reservation.findFirst({
+          where: { id, restaurantId, deletedAt: null },
+        });
 
-      if (!existing) {
-        return { success: false, error: "Reservation not found", code: 404 };
-      }
+        if (!existing) {
+          throw new NotFoundError("Reservation not found");
+        }
 
-      await prisma.reservation.update({
-        where: { id },
-        data: { deletedAt: new Date() },
+        await tx.reservation.update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        });
+
+        await AuditLogger.log(tx, {
+          entity: "Reservation",
+          entityId: id,
+          action: "DELETE",
+          restaurantId,
+        });
       });
 
       return { success: true, data: undefined };
-    } catch (error) {
+    } catch (error: any) {
       console.error("Delete reservation error:", error);
+      if (error instanceof AppError) {
+        return { success: false, error: error.message, code: error.statusCode };
+      }
       return { success: false, error: "Failed to delete reservation", code: 500 };
     }
   }
@@ -328,7 +367,8 @@ class ReservationService {
         return { success: false, error: "Table not found", code: 404 };
       }
 
-      const hasConflict = await this.checkTableConflict(prisma, tableId, new Date(scheduledAt), restaurantId);
+      // Pass lockTable=false since we don't want to lock for a simple check
+      const hasConflict = await this.checkTableConflict(prisma as any, tableId, new Date(scheduledAt), restaurantId, undefined, false);
 
       return {
         success: true,
