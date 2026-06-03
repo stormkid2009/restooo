@@ -321,10 +321,11 @@ model OrderItem {
 
 model Reservation {
   id              String            @id @default(uuid())
-  customerId      String
+  customerId      String?
+  guestName       String?
+  guestPhone      String?
   tableId         String?
-  date            DateTime // Reservation date
-  time            String // Reservation time (e.g., "19:30")
+  scheduledAt     DateTime // Merged date and time
   partySize       Int // Number of guests
   status          ReservationStatus @default(PENDING)
   specialRequests String?
@@ -333,13 +334,13 @@ model Reservation {
   deletedAt       DateTime? // ✅ Soft delete
 
   // Relations
-  customer     Customer   @relation(fields: [customerId], references: [id])
+  customer     Customer?  @relation(fields: [customerId], references: [id])
   table        Table?     @relation(fields: [tableId], references: [id])
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@index([restaurantId, date])
-  @@index([customerId, date])
+  @@index([restaurantId, scheduledAt])
+  @@index([customerId, scheduledAt])
   @@index([restaurantId, deletedAt])
   @@map("reservations")
 }

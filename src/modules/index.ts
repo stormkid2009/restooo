@@ -7,7 +7,7 @@ import customerRoutes from "./customer/customer.routes";
 
 // Future route imports
 import orderRoutes from './order/order.routes';
-// import reservationRoutes from './reservationRoutes';
+import reservationRoutes from './reservation/reservation.routes';
 import tableRoutes from './table/table.routes';
 // import staffRoutes from './staffRoutes';
 // import analyticsRoutes from './analyticsRoutes';
@@ -64,17 +64,17 @@ router.use('/order', orderRoutes);
 
 /**
  * Reservation Management Routes
- * @prefix /api/v1/reservations
+ * @prefix /api/v1/reservation
  * @routes
  *   - GET / - List all reservations
  *   - GET /availability - Check table availability
  *   - GET /:id - Get single reservation
  *   - POST / - Create reservation
- *   - PATCH /:id - Update reservation
+ *   - PUT /:id - Update reservation
+ *   - PATCH /:id/status - Update reservation status
  *   - DELETE /:id - Cancel reservation
- * @todo Implement reservation routes
  */
-// router.use('/reservations', reservationRoutes);
+router.use('/reservation', reservationRoutes);
 
 /**
  * Customer Management Routes
